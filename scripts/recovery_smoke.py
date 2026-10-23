@@ -111,14 +111,15 @@ try:
         keys[name] = request("/api/keys", {"name": "recovery-" + name, "permissions": ["read", "write", "archive"],
                                            "projects": ["recovery-demo"]}, csrf)
     token = keys["valid"]["token"]
-    original_args = fields("decision", "Original decision", operation_id="recovery-retry-001")
+    original_args = fields("decision", "Original decision", operation_id="recovery-retry-001", is_testing=True)
     original_note = tool(token, "save_memory", original_args)
     assert tool(token, "save_memory", original_args) == original_note
     note = original_note
     note = tool(token, "revise_memory", {**fields("decision", "Revised decision"), "id": note["id"], "expected_revision": 1})
     archived = tool(token, "save_memory", fields("fact", "Archived fixture"))
     tool(token, "archive_memory", {"id": archived["id"], "expected_revision": 1})
-    skill = tool(token, "save_memory", fields("skill", "Published fixture"))
+    skill_metadata = {"trigger":"Review synthetic fixtures", "version":"1.0", "compatibility":["OpenCode"], "test_evidence":"isolated recovery smoke"}
+    skill = tool(token, "save_memory", fields("skill", "Published fixture", skill_metadata=skill_metadata))
     request("/api/notes/" + skill["id"] + "/publish", {"expected_revision": 1}, csrf)
     overview = tool(token, "save_memory", fields("knowledge", "Overview fixture", is_project_summary=True, related_to=[skill["id"]], supersedes=[note["id"]]))
     request("/api/keys/" + keys["revoked-before"]["key"]["id"] + "/revoke", {}, csrf)
@@ -158,7 +159,9 @@ try:
     current_activity = request("/api/activity")
     for event in expected_activity:
         assert event in current_activity, "Audit event missing after restore"
-    assert tool(token, "get_skill", {"id": skill["id"]})["status"] == "active"
+    restored_skill = tool(token, "get_skill", {"id": skill["id"]})
+    assert restored_skill["status"] == "active" and restored_skill["skill_metadata"] == skill_metadata
+    assert tool(token, "read_memory", {"id":note["id"]})["is_testing"] is True
     tool(token, "read_memory", {"id": note["id"]})
     tool(token, "get_context", {"project": "outside-scope"}, error=True)
     expect_status(401, lambda: tool(keys["revoked-before"]["token"], "read_memory", {"id": note["id"]}))

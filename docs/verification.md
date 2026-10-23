@@ -1,5 +1,84 @@
 # Laporan verifikasi pengembangan
 
+## Optimasi graph adaptif — 23 Oktober 2026
+
+User menyetujui optimasi tanpa mengganti library. File baru `frontend/src/lib/graph-quality.ts` memusatkan profil kualitas, pemilihan label dan scheduler trailing timer+RAF. Renderer/wrapper/toolbar menggunakannya: mode Ringan saat >100node ATAU >300edge (DPR1, nodeResolution6, cooldown60tick/1800ms), normal DPR<=1.5/resolution12/cooldown120tick/3000ms. Seluruh500 node tetap diterima. LinkWidth0 memakai Three.Line, tanpa kurva kecuali self-loop, panah hanya relasi hover/selected. Default label hanya active; opt-in24/48 node terdekat, proyeksi/pembaruan dibatasi80/50ms, tidak memproyeksikan seluruh500 label per tick. Tidak ada physics warmup tambahan pada reduced-motion; seed layout deterministik tetap tersedia. Tidak mematikan render/picking ketika physics dingin: orbit/zoom/klik tetap tersedia; loop library masih aktif kecuali manual pause/visibility/dialog.
+
+Review source independen menemukan dua masalah paused yang turut diperbaiki: data baru saat paused membutuhkan sinkronisasi mesh melalui satu tickFrame inner ThreeForceGraph dengan cooldown0 tanpa physics/resume; reset paused perlu mengatur target orbit ke pusat bounding box sebelum zoomToFit. Akses inner force object dibatasi duck-typed method pada scene versi dependency terpin, bukan perubahan source dependency; perlu acceptance saat upgrade.
+
+Bukti aktual:
+
+- `npm test`: **55 lulus**, termasuk adaptive threshold/dense links, label bounded500 input nonmutating, scheduler burst500 coalescing/trailing/dispose+latecallback dan source-contract renderer. Ini bukan browser test atau pengukuran FPS.
+- `npm run build`: **0 Svelte error/0 warning**, Vite sukses; final `index-BClwiyEw.js`, `index-WIWl8UHS.css`, lazy `three-graph-renderer-iILbJV-V.js`. Warning chunk1393.63kB/373.57kB gzip tetap ada; optimasi ini runtime, bukan pengurangan download library.
+- Offline `make test vet build-go GO=/usr/local/go/bin/go` lulus (server35.174s); setelah perbaikan paused final, build-go diulang lulus. Go source tidak diubah. Binary smoke final `.cache/tmp/smoke-jf4i5qd_` lulus; fixture sebelumnya `.cache/tmp/smoke-yn04yogm` juga lulus.
+- Diff check ditinjau tanpa commit/hapus/stage. Tidak ada dependency baru, perubahan data/API/izin/config atau restart layanan pengguna.
+
+Batas: belum ada browser/tools GPU untuk profil FPS/main-thread atau acceptance500 nodes. Perubahan mengurangi pekerjaan per frame secara struktural, bukan jaminan bebas lag setiap perangkat. Uji manual diperlukan: orbit/zoom/hover, label terdekat, paused->ubah filter/reset, reduced-motion dan buka/tutup note. Pengukuran FPS sebelum/sesudah belum tersedia; race tidak diulang untuk increment frontend-only.
+
+## Revisi UI graph-first — 23 Oktober 2026
+
+Permintaan pengguna: graph lebih besar dan fokus kanvas, filter rapi, kontrol ikon ringkas, hilangkan kontrol kamera tanpa gesture/penjelajah, klik node melihat isi. Skill UI/UX Pro Max digunakan: pencarian ikon pertama domain ux tidak tepat, dipersempit domain icons untuk accessible name/state; guidance Svelte derived/effect sesuai implementasi. Tidak memasang dependency baru.
+
+Perubahan di `KnowledgeGraph.svelte`, `ThreeGraphCanvas.svelte`, `Icon.svelte`, App/style dan detail: heading ringkas, kanvas viewport besar, toolbar pencarian/proyek dan filter popover, kontrol ikon44px dengan glyph18px, legend kecil. Inspector/list permanen dan bagian kamera dihilangkan. Pencarian judul memberi maksimal20 tombol hasil metadata yang dimuat; Enter mencari server. Escape/outside/focusout menutup popover. Klik node langsung memakai endpoint admin detail yang sudah ada; dialog graph menampilkan isi goldmark safe-mode sebelum metadata, renderer dijeda selama detail/loading. Keyboard kanvas dan fallback select hanya ketika WebGL gagal dipertahankan. Responsive <=520px memakai search baris sendiri agar tidak terjepit sidebar pada375px. Data/API/izin/relasi tidak berubah, batas500 tetap.
+
+Verifikasi aktual:
+
+- `npm test`: **51 lulus**, termasuk4 regresi compile/source-contract baru untuk wiring buka detail/pause, dua branch konten eksklusif, kontrol ikon tanpa inspector dan fallback native. Ini bukan test DOM/browser.
+- `npm run build`: Svelte **0 error/0 warning**, Vite lulus; aset final `index-CZe888jf.js`, `index-Bs-mDUoB.css`, lazy graph `three-graph-renderer-CPUcrZiF.js`. Warning chunk1393.02kB/373.37kB gzip tetap dilaporkan.
+- Offline `make test vet build-go GO=/usr/local/go/bin/go` lulus (server34.437s); setelah penyesuaian CSS mobile final, build-go diulang lulus. Tidak ada perubahan Go source pada increment ini.
+- Binary smoke final lulus, fixture `.cache/tmp/smoke-jgre2s5t`, termasuk embed entry/lazy chunk dan kontrak keamanan HTTP. Smoke terdahulu `.cache/tmp/smoke-1y_zovg7` juga lulus.
+- Diff check lulus. Browser/tools/executable tidak tersedia, sehingga ukuran375px/GPU/gesture/fokus/visual light-dark belum diverifikasi manual. Race tidak diulang untuk increment UI-only ini.
+
+Tidak ada restart/deployment, perubahan data contoh atau commit. Binary telah dibangun tetapi layanan aktif masih versi sebelumnya sampai aktivasi mendapat persetujuan. CSP upstream style-injection dan batas performa500 node tetap seperti catatan sebelumnya.
+
+## Dataset contoh graph 500 — 23 Oktober 2026
+
+Pengguna meminta 150 lalu tambahan 350 catatan sintetis. Proyek terpisah `demo-graph-500` kini memiliki tepat 500 catatan nonarsip (1 summary + 10 hub + 489 leaf), seluruhnya is_testing=true. Distribusi: knowledge191, decision120, handoff69, fact60, skill60; 440 unverified dan 60 skill draft, tanpa publikasi skill. Semua ditulis melalui MCP dengan operation_id; rate limit sempat menolak batch dan dipatuhi dengan pacing, bukan dinonaktifkan. Tidak ada penulisan file datastore langsung.
+
+Verifikasi read-only terfilter proyek demo: 1476 related_to + 60 supersedes = 1536 relasi berarah, 1 komponen terhubung berisi 500 node, 0 node terisolasi, 0 referensi dangling, 0 siklus supersedes, 0 overlap kedua jenis relasi dan 0 judul duplikat. Data bukan fakta proyek atau hasil uji operasional. Tidak ada manifest dibuat; tidak ada penghapusan contoh otomatis.
+
+Source visual diperluas ke batas500 (request API, layout, salinan data force engine, cache posisi, caption). Relaksasi awal deterministik dibatasi sekitar2 juta pair interactions dengan16 pass pada500 nodes, bukan180 pass untuk seluruh kapasitas. Test frontend47 lulus, Svelte0 error/0 warning, Vite/build-go offline lulus; warning lazy chunk besar tetap ada. Aset baru index-C5nEdL3l.js dan three-graph-renderer-CPUcrZiF.js. Browser/WebGL500 node belum diuji. Binary sudah dibangun tetapi belum diaktifkan untuk increment kapasitas ini; permintaan persetujuan restart ditutup tanpa jawaban sehingga tidak dilakukan. UI layanan lama masih membatasi100 node sampai aktivasi disetujui.
+
+## Graph 3D — 23 Oktober 2026, pilihan akhir `3d-force-graph`
+
+Pengguna menyetujui dependency lokal dan kemudian secara khusus memilih https://github.com/vasturiano/3d-force-graph. Renderer Three.js custom yang sempat dibuat diganti sebelum increment ini dilaporkan selesai. Implementasi akhir memakai `3d-force-graph@1.80.1`, `three@0.186.1` dan dev `@types/three@0.186.0`, versi dipatok lockfile; pemasangan lokal memakai `--ignore-scripts`, tidak ada instalasi global/deployment.
+
+File utama: `frontend/src/lib/components/KnowledgeGraph.svelte`, `ThreeGraphCanvas.svelte`, `three-graph-renderer.ts`, `three-graph-layout.ts`, `force-graph-data.ts`, dua test pendamping, package/lockfile dan dist. Helper menyalin data sebelum d3 memutasi posisi/endpoint, membatasi 100 node, mempertahankan arah/jenis relasi serta node terisolasi/siklus. Renderer mempertahankan koordinat lokal/kamera lintas filter, drag node dan orbit, simulasi maksimal 180 tick / 5 detik, jeda/visibility/reduced-motion, label teks tanpa tooltip HTML, cleanup dan fallback context loss. Inspector di bawah kanvas menghindari menutupi klik; buka memori memakai tombol eksplisit, bukan double-click. Tidak mengubah API, izin, histori atau struktur memori menjadi pohon.
+
+Bukti aktual:
+
+- `npm test`: **44 lulus / 0 gagal**, termasuk determinisme layout/depth, bounds, cloning/endpoint mutation isolation, siklus/arah/jenis/dangling edge. Ini bukan test rendering GPU. Test fallback fake-DOM pada renderer custom tidak dipakai sebagai bukti implementasi akhir karena library memerlukan window/WebGL.
+- `npm run build`: Svelte **0 error / 0 warning**, Vite sukses. Dist terbaru `index-DFpBuduC.js`, `index-C1xgUOrM.css`, lazy graph `three-graph-renderer-DM5CgE2I.js`. Chunk graph **1393.02 kB minified / 373.36 kB gzip**, Vite mengeluarkan warning >500 kB yang tidak disembunyikan; hanya dimuat ketika graph diperlukan.
+- Offline `make test vet build-go GO=/usr/local/go/bin/go`: **lulus** setelah dist final, server 33.365s. Race tidak diulang khusus increment UI ini; hasil race SEC-02/QUAL-02 di bawah adalah bukti increment sebelumnya, bukan rendering baru.
+- Python unit suite **72 lulus**. `scripts/smoke.py` final **lulus**, fixture `.cache/tmp/smoke-otg2_sy1`; tambahan smoke mengambil lazy chunk dari referensi entry JS dan memverifikasi aset disajikan binary embed. Tidak mengeksekusi WebGL.
+- `npm ls --depth=0` menunjukkan dependency terpasang konsisten. Diff diperiksa tanpa menghapus dirty work sebelumnya; tidak ada commit/push atau aktivasi binary.
+
+Keterbatasan: tidak ada browser executable/tool yang tersedia sehingga acceptance visual, GPU, pointer/touch/keyboard nyata, lifecycle dan context-loss belum diverifikasi. Library upstream menyisipkan style tag saat import yang dapat memunculkan CSP violation; CSP tetap `style-src 'self'`, tidak mengedit dependency/cache atau menambah unsafe-inline. Style wrapper lokal dan tooltip/nav bawaan dinonaktifkan, tetapi acceptance runtime CSP tetap perlu. Loop render library berjalan ketika tidak dijeda meskipun simulasi dingin; bukan renderer demand-only. [Checklist acceptance](frontend.md#acceptance-graph-3d-yang-masih-diperlukan).
+
+## SEC-02 dan QUAL-02 — 23 Oktober 2026
+
+Pengguna meminta rate-limit/audit keamanan serta waktu verifikasi/perlu review. Git tersedia; tujuh file sudah dirty sebelum pengerjaan dan dipertahankan. Pengguna melaporkan acceptance OpenCode; Hermes/harness lain tidak dianggap otomatis lulus. Tidak ada commit, restart/deployment, konfigurasi proxy/service/global atau perubahan data aktif.
+
+Implementasi:
+
+- `internal/server/security.go`, server wiring dan limiter: peer/preauth terpisah dari invalid/valid MCP, per-key sebelum shared valid, batas dua autentikasi di dalam delapan request global, login peer+aggregate, RemoteAddr tanpa forwarded trust. Kegagalan dicatat fixed actor/action tanpa token/password/alamat, maksimal satu percobaan/menit dan satu write in-flight 250ms, counter agregat admin `/api/request-security`. [Kontrak/retensi/gap](request-security.md).
+- `internal/memory/review_metadata.go` + store/receipt: verified_at UTC kanonis self-declared, needs_review eksplisit non-skill, preserve/clear/status transition, immutable history dan receipt lama kompatibel bila metadata omitted. Tidak ada inferensi konflik atau waktu pemeriksaan otomatis. Server/UI/MCP/diff/filter meneruskan peringatan. [Kontrak dan rollback](review-metadata.md).
+
+Verifikasi final aktual:
+
+- Offline `make test vet build-go GO=/usr/local/go/bin/go` **lulus**; server test 32.705s.
+- Offline `make race GO=/usr/local/go/bin/go` **lulus** setelah integrasi final; access 50.372s, memory 8.820s, server 133.225s. Run parent terdahulu timeout 300s saat pengujian paralel; tidak diklaim lulus. Run agen security sebelumnya juga lulus. Final run serial mempunyai timeout 600s.
+- `npm test`: **40 lulus / 0 gagal**. `npm run build`: Svelte **0 error / 0 warning**, Vite sukses; dist `index-CDMSDh6_.js` dan `index-CfQasemn.css`. Ini helper/typecheck, bukan DOM/browser acceptance increment baru.
+- Python unit suite: **72 lulus**. Smoke final `.cache/tmp/smoke-wblo4kgc` **lulus**, termasuk review metadata bertahan restart, endpoint counter/security dan revoke. Recovery smoke `.cache/tmp/recovery-smoke-gqp47psu` **lulus**.
+- `git diff --check` lulus; diff source ditinjau, tanpa stage/commit/push atau mengubah dirty work sebelumnya.
+
+Dua diagnosis integrasi dicatat, bukan disembunyikan:
+
+1. Test empat concurrent idempotent retries sesekali mendapat 503 karena batas dua autentikasi baru. Test tetap memakai empat caller/real transport/production caps dan retry terbatas operation ID + payload yang sama pada 503; kesamaan revisi dan tidak adanya mutasi ganda tetap diperiksa. Security test terpisah mengunci batas concurrency.
+2. Smoke membandingkan seluruh tree saat online-health gagal hanya pada `memona.db-shm`: pembacaan autentikasi sesi SQLite mengubah koordinasi reader SHM. Asersi online tetap membandingkan DB/WAL/Markdown/staging, kecuali bytes SHM volatile. Uji offline inspect tetap seluruh tree byte-identik; tidak menonaktifkan validasi durable storage.
+
+Gap: audit append-only belum memiliki kebijakan retensi/monitoring disk; shared proxy/preauth/table/global concurrency masih dapat membatasi klien sah pada beban ekstrem; bukan fairness absolut atau DDoS protection. QUAL-02 tidak mendeteksi konflik semantik/expiry otomatis; waktu dapat dipertahankan saat isi berubah dan butuh re-review penulis. Binary dibangun tetapi belum diaktifkan. Metadata baru dapat membuat binary lama menolak histori; rollback membutuhkan pasangan data/binary kompatibel.
+
 ## Integrasi metadata, bundle, graph dan batas context — 23 Oktober 2026
 
 Pengerjaan lokal OpenCode melanjutkan increment yang belum dilaporkan: metadata `is_testing` dan skill terstruktur dengan canonical/receipt compatibility, integrasi editor/MCP/exporter teks, 11-tool schema, MCP duplicate candidates, alasan pemilihan context, graph pointer/focus/RAF fixes, benchmark read serentak dan evaluasi semantic sintetis. Tidak ada aktivasi layanan atau migrasi data.
@@ -14,9 +93,9 @@ Bukti command aktual:
 - `npm test` **38 lulus / 0 gagal** (helper/API/graph/editor/metadata diff, bukan DOM).
 - `npm run build` **lulus**, Svelte **0 error / 0 warning**, Vite 138 module. Dist terbaru `index-DKoNbxvA.js` + `index-CfQasemn.css`.
 - `make build-go` offline diulang setelah frontend final **lulus**.
-- `python3 -B -m unittest discover -s scripts -p 'test_*.py'` **70 lulus**, mencakup 16 exporter bundle + 7 verifier bundle + 47 sebelumnya. Semua fixture sintetis ditahan dalam cache proyek; tidak cleanup.
+- `python3 -B -m unittest discover -s scripts -p 'test_*.py'` **72 lulus**, mencakup 16 exporter bundle + 9 verifier bundle + 47 sebelumnya. Semua fixture sintetis ditahan dalam cache proyek; tidak cleanup.
 - Binary smoke final **lulus**, fixture `.cache/tmp/smoke-bbnf7sjf`: assets embed, 11 tools, testing filter/opt-in, duplicate candidates, alasan context, idempotency/restart/revoke/health/inspect.
-- Recovery smoke final **lulus**, fixture `.cache/tmp/recovery-smoke-sixc7p6m`: backup/verify/restore terisolasi, scope/revoke/notes/history/skill/audit dan replay. Tidak menyentuh data pengguna.
+- Recovery smoke final **lulus**, fixture `.cache/tmp/recovery-smoke-_m1exlpo`: backup/verify/restore terisolasi, scope/revoke/notes/history/skill/audit dan replay, termasuk pelestarian is_testing/skill_metadata setelah restore. Tidak menyentuh data pengguna.
 - Benchmark read dan semantic evaluation: lihat [hasil resource](resource-benchmark-2026-10.md), [evaluasi semantic](semantic-search-evaluation.md); full Go run juga mencakup test semantic final setelah metadata lengkap. Hasil 5/9 hanya fixture sintetis kecil, bukan dataset pengguna.
 - Git status diperiksa: bukan repository; tidak ada klaim diff/commit. Source terkait dibaca ulang, gofmt dan typecheck dilakukan.
 

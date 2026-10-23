@@ -3,7 +3,6 @@
 
 Checks integrity and supported structure, not provenance, safety or native discovery.
 """
-import argparse
 import hashlib
 import json
 import os

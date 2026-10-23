@@ -8,7 +8,7 @@ Panduan utama berada di `internal/server/agent-guide.md` dan ditanam ke executab
 2. **Tool `get_memory_guide`** dengan argumen `{}`: mengembalikan panduan Markdown lengkap. Tersedia untuk koneksi API key valid, tanpa membuka data proyek di luar scope. Key tidak perlu izin write untuk membaca dokumentasi umum.
 3. **Resource `memona://guide`**: panduan sama untuk harness yang mendukung discovery dan pembacaan resource MCP.
 
-Untuk build ini ada sepuluh tool, termasuk `get_memory_relations`. Memuat panduan tidak melakukan save atau mengubah izin. Wrapper nama berbeda antarklien; gunakan discovery aktual, bukan nama prefiks tebakan. Panduan tidak bisa menjamin agen selalu patuh; verifikasi hasil tool dan instruksi persisten harness tetap diperlukan. Panduan terbaru juga menjelaskan ringkasan proyek, relasi eksplisit dan backlink.
+Untuk build terbaru ada sebelas tool, termasuk `get_memory_relations` dan `find_duplicate_candidates`. Memuat panduan tidak melakukan save atau mengubah izin. Wrapper nama berbeda antarklien; gunakan discovery aktual, bukan nama prefiks tebakan. Panduan tidak bisa menjamin agen selalu patuh; verifikasi hasil tool dan instruksi persisten harness tetap diperlukan. Panduan terbaru juga menjelaskan ringkasan proyek, relasi eksplisit dan backlink.
 
 ## Contoh permintaan pengguna
 

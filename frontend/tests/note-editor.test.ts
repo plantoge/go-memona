@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialNoteInput, noteEditorErrors, noteEditorInput, compareNoteLines } from '../src/lib/note-editor.ts';
+import { initialNoteInput, noteEditorErrors, noteEditorInput, compareNoteLines, canonicalVerificationTime, verificationTimeNow } from '../src/lib/note-editor.ts';
 
 const valid = { project: 'demo', kind: 'knowledge', title: 'Judul', content: '# Isi\nbaris kedua', source: '', status: 'unverified' };
 test('editor sends complete replacement content without metadata or response fields', () => {
@@ -39,6 +39,21 @@ test('skill review metadata is bounded and copied without aliases', () => {
   assert.equal(minimal.skill_metadata?.trigger, '');
   assert.ok(noteEditorErrors({ ...input, kind: 'fact', status: 'unverified' }).skill_metadata);
   assert.ok(noteEditorErrors({ ...input, skill_metadata: { ...metadata, trigger: 'é'.repeat(501) } }).skill_metadata);
+});
+test('review fields preserve declared time, clear explicitly and validate status/UTC', () => {
+  assert.equal('verified_at' in noteEditorInput(valid), false);
+  const input = { ...valid, status:'verified', source:'checked against fixture', verified_at:'2026-10-23T09:00:00Z', needs_review:true };
+  assert.deepEqual(noteEditorErrors(input), {});
+  assert.equal(noteEditorInput(input).needs_review, true);
+  assert.equal(noteEditorInput({...valid,verified_at:'',needs_review:false}).verified_at, '');
+  assert.ok(noteEditorErrors({...input,status:'unverified'}).verified_at);
+  assert.ok(noteEditorErrors({...input,verified_at:'2026-10-23T09:00:00+07:00'}).verified_at);
+  assert.ok(noteEditorErrors({...input,verified_at:'not a timestamp'}).verified_at);
+  assert.equal(canonicalVerificationTime('2026-02-30T09:00:00Z'), false);
+  assert.equal(canonicalVerificationTime('2026-10-23T09:00:00.100Z'), false);
+  assert.equal(canonicalVerificationTime('2026-10-23T09:00:00.123456789Z'), true);
+  assert.equal(canonicalVerificationTime(verificationTimeNow()), true);
+  assert.ok(noteEditorErrors({...valid,kind:'skill',status:'draft',needs_review:false}).verified_at);
 });
 test('testing flag is explicit, omission stays omitted and false clears', () => {
   assert.equal('is_testing' in noteEditorInput(valid), false);

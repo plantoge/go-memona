@@ -116,7 +116,7 @@
         if (id !== requestID) return;
         registry = array(entries); status = `${registry.length} proyek terdaftar.`;
       } else if (view === 'graph') {
-        const params = new URLSearchParams({ project: graphFilters.project, q: graphFilters.query, archived: String(graphFilters.archived), limit: '200' });
+        const params = new URLSearchParams({ project: graphFilters.project, q: graphFilters.query, archived: String(graphFilters.archived), limit: '500' });
         const result = await api.request<unknown>(`/api/graph?${params}`);
         if (id !== requestID) return;
         graph = graphData(result); status = `${graph.nodes.length} memori dan ${graph.edges.length} relasi dimuat.${graph.truncated ? ' Hasil dibatasi.' : ''}`;
@@ -330,7 +330,7 @@
         <div class="sidebar-bottom"><button type="button" class="secondary sidebar-logout" aria-label="Keluar" title={!sidebarOpen ? 'Keluar' : undefined} disabled={authBusy} onclick={logout}><Icon name="logout" /><span class="nav-text">Keluar</span></button></div>
       </div>
     </aside>
-    <main id="main" tabindex="-1" bind:this={main!}>
+    <main id="main" class:graph-workspace={view === 'graph'} tabindex="-1" bind:this={main!}>
       <h1 class="sr-only">{titles[view]}</h1>
       {#if error}<p id="error" role="alert">{error}</p>{/if}
       {#if view === 'notes' || view === 'skills'}
@@ -338,7 +338,7 @@
          {#if creating}<section aria-label="Memori baru"><NoteEditor saving={contentSaving} project={filters.project} onduplicates={checkDuplicates} onsubmit={input => saveContent(input, true)} oncancel={() => { creating = false; }} /></section>{/if}
         {#key view}<Notes {notes} {projects} {loading} {projectLoading} skills={view === 'skills'} onsearch={search} onopen={openNote} />{/key}
       {:else if view === 'graph'}
-        <Graph data={graph} {projects} {loading} {projectLoading} onsearch={searchGraph} onopen={openNote} />
+        <Graph data={graph} {projects} {loading} {projectLoading} suspended={detailOpen} onsearch={searchGraph} onopen={openNote} />
       {:else if view === 'keys'}
         <Keys {keys} {keyUsage} {loading} {saving} {token} {endpoint} {error} {latestKeyID} projectOptions={projects} oncreate={createKey} onrevoke={revokeKey} ondismiss={() => { token = ''; status = 'Token ditutup dan tidak dapat ditampilkan kembali.'; }} onstatus={message => status = message} />
         <nav aria-label="Halaman kunci API" class="actions"><button type="button" class="secondary" disabled={loading || saving || !!token || !keyCursors.length} onclick={() => changeKeyPage(false)}>Sebelumnya</button><button type="button" class="secondary" disabled={loading || saving || !!token || !keyNext} onclick={() => changeKeyPage(true)}>Berikutnya</button></nav>
@@ -356,4 +356,4 @@
     </main>
   </div>
 {/if}
-{#if detailOpen && session === 'in'}<NoteDetail {detail} loading={detailLoading} saving={detailSaving} error={detailError} onclose={closeDetail} onchange={changeNote} onopen={openNote} onhistory={loadHistory} onrestoreskill={restoreSkillContent} onduplicates={checkDuplicates} onsaveconnections={saveConnections} onsavecontent={input => saveContent(input)} />{/if}
+{#if detailOpen && session === 'in'}<NoteDetail {detail} contentFirst={view === 'graph'} loading={detailLoading} saving={detailSaving} error={detailError} onclose={closeDetail} onchange={changeNote} onopen={openNote} onhistory={loadHistory} onrestoreskill={restoreSkillContent} onduplicates={checkDuplicates} onsaveconnections={saveConnections} onsavecontent={input => saveContent(input)} />{/if}

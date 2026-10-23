@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { View } from '../types';
 
-  let { name }: { name: View | 'panel' | 'chevron' | 'logout' | 'sun' | 'moon' | 'plus' | 'copy' | 'close' | 'refresh' | 'server' | 'key' | 'edit' | 'trash' | 'zoom-in' | 'zoom-out' } = $props();
+  let { name }: { name: View | 'panel' | 'chevron' | 'logout' | 'sun' | 'moon' | 'plus' | 'copy' | 'close' | 'refresh' | 'server' | 'key' | 'edit' | 'trash' | 'zoom-in' | 'zoom-out' | 'search' | 'filter' | 'pause' | 'play' | 'fit' | 'expand' } = $props();
 </script>
 
 <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -19,6 +19,16 @@
     <circle cx="5" cy="6" r="3" /><circle cx="19" cy="6" r="3" /><circle cx="12" cy="19" r="3" /><path d="M8 6h8M6.5 9l4 7m7-7-4 7" />
   {:else if name === 'zoom-in' || name === 'zoom-out'}
     <circle cx="10" cy="10" r="7" /><path d="m15 15 6 6M6 10h8" />{#if name === 'zoom-in'}<path d="M10 6v8" />{/if}
+  {:else if name === 'search'}
+    <circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4.5 4.5" />
+  {:else if name === 'filter'}
+    <path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="2.5" fill="var(--surface)" /><circle cx="15" cy="17" r="2.5" fill="var(--surface)" />
+  {:else if name === 'pause'}
+    <path d="M8 5v14M16 5v14" stroke-width="3" />
+  {:else if name === 'play'}
+    <path d="m8 5 11 7-11 7Z" />
+  {:else if name === 'fit' || name === 'expand'}
+    <path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5" />{#if name === 'fit'}<circle cx="12" cy="12" r="3" />{/if}
   {:else if name === 'activity'}
     <path d="M3 12h4l3-8 4 16 3-8h4" />
   {:else if name === 'panel'}

@@ -17,7 +17,14 @@ import (
 func TestMCPDiscoveredOutputSchemas(t *testing.T) {
 	f := setup(t)
 	flag := true
-	target := makeNote(t, f, "demo", "decision", "Original decision", nil)
+	target := makeNote(t, f, "demo", "decision", "Original decision", func(in *memory.Input) {
+		stamp := "2026-10-23T09:00:00Z"
+		flag := true
+		in.Status = "verified"
+		in.Source = "synthetic evidence"
+		in.VerifiedAt = &stamp
+		in.NeedsReview = &flag
+	})
 	overview := makeNote(t, f, "demo", "knowledge", "Project summary", func(in *memory.Input) {
 		in.IsProjectSummary = &flag
 		in.RelatedTo = []string{target.ID}

@@ -90,8 +90,11 @@ func (op Operation) record(input Input) (*operationRecord, error) {
 		RelatedTo, Supersedes                                 []string
 		IsTesting                                             *bool          `json:",omitempty"`
 		SkillMetadata                                         *SkillMetadata `json:",omitempty"`
+		VerifiedAt                                            *string        `json:",omitempty"`
+		NeedsReview                                           *bool          `json:",omitempty"`
 	}{op.NoteID, input.Project, input.Kind, input.Title, input.Content, input.Status, input.Source,
-		op.ExpectedRevision, input.IsProjectSummary, input.RelatedTo, input.Supersedes, input.IsTesting, input.SkillMetadata}
+		op.ExpectedRevision, input.IsProjectSummary, input.RelatedTo, input.Supersedes, input.IsTesting, input.SkillMetadata,
+		input.VerifiedAt, input.NeedsReview}
 	return &operationRecord{Version: 1,
 		Scope: hashJSON([]string{op.Principal, op.Tool, op.ID}), Payload: hashJSON(payload)}, nil
 }
@@ -122,6 +125,9 @@ func (s *Store) executeLocked(op Operation, input Input, author string, budget *
 	}
 	if !validText(author, 200, true) {
 		return Note{}, ErrInvalid
+	}
+	if op.Tool == "archive_memory" && (input.VerifiedAt != nil || input.NeedsReview != nil) {
+		return Note{}, fmt.Errorf("%w: archive preserves review metadata; revise it separately", ErrInvalid)
 	}
 	record, err := op.record(input)
 	if err != nil {

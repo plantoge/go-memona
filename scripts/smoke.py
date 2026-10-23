@@ -74,6 +74,16 @@ try:
             assert response.status == 200 and len(response.read()) > 0
         with urllib.request.urlopen(urllib.request.Request(origin + asset, method="HEAD")) as response:
             assert response.read() == b"", "HEAD returned body"
+    # Exercise the lazy graph asset URL as an embedded static file, not as a
+    # browser/WebGL acceptance claim. The current index references this import.
+    entry_js = next(asset for asset in assets if asset.endswith('.js'))
+    with urllib.request.urlopen(origin + entry_js) as response:
+        entry_source = response.read().decode()
+    graph_assets = set(re.findall(r'three-graph-renderer-[A-Za-z0-9_-]+\.js', entry_source))
+    assert graph_assets, 'lazy graph chunk reference missing'
+    for asset in graph_assets:
+        with urllib.request.urlopen(origin + '/assets/' + asset) as response:
+            assert response.status == 200 and len(response.read()) > 0
     for private_path in ["/config.json", "/frontend/src/App.svelte", "/data/", "/app.js"]:
         try:
             urllib.request.urlopen(origin + private_path)
@@ -122,11 +132,12 @@ try:
     revise_args = {**retry_args, "id": retry_note["id"], "expected_revision": 1, "content": "Revised retry."}
     retry_revision = mutation("revise_memory", revise_args)
     assert mutation("revise_memory", revise_args) == retry_revision
-    result = rpc(token, "tools/call", {"name": "save_memory", "arguments": {"project": "smoke-test", "kind": "decision", "title": "Binary smoke fixture", "content": "Synthetic persistence check.", "status": "verified", "source": "isolated smoke fixture"}})["result"]
+    result = rpc(token, "tools/call", {"name": "save_memory", "arguments": {"project": "smoke-test", "kind": "decision", "title": "Binary smoke fixture", "content": "Synthetic persistence check.", "status": "verified", "source": "isolated smoke fixture", "verified_at":"2026-10-23T09:00:00Z", "needs_review":True}})["result"]
     assert not result.get("isError"), "save failed"
     note = json.loads(result["content"][0]["text"])
     detail = request("/api/notes/" + note["id"])
     assert detail["note"]["content"] == "Synthetic persistence check."
+    assert detail["note"]["verified_at"] == "2026-10-23T09:00:00Z" and detail["note"]["needs_review"] is True
     result = rpc(token, "tools/call", {"name": "save_memory", "arguments": {"project": "smoke-test", "kind": "knowledge", "title": "Project overview fixture", "content": "Synthetic project overview.", "status": "unverified", "source": "", "is_project_summary": True, "supersedes": [note["id"]]}})["result"]
     assert not result.get("isError"), "summary/relation save failed"
     overview = json.loads(result["content"][0]["text"])
@@ -151,6 +162,7 @@ try:
     session = request("/api/login", {"password": password})
     csrf = {"X-CSRF-Token": session["csrf"]}
     assert request("/api/notes/" + note["id"])["note"]["revision"] == 1
+    assert request("/api/notes/" + note["id"])["note"]["needs_review"] is True
     persisted = request("/api/notes/" + overview["id"])["note"]
     assert persisted["revision"] == 2 and persisted["is_project_summary"]
     assert persisted["related_to"] == [note["id"]] and not persisted.get("supersedes")
@@ -166,6 +178,12 @@ try:
     except urllib.error.HTTPError as error:
         assert error.code == 401
 
+    security = request('/api/request-security')
+    assert security['counters']['auth_failures'] >= 1
+    assert security['counters']['audit_sampled'] >= 1
+    assert 'append-only' in security['audit_retention']
+    assert token not in json.dumps(security)
+
     def snapshot():
         return {str(p.relative_to(work / "data")): (p.stat().st_mode, hashlib.sha256(p.read_bytes()).hexdigest())
                 for p in (work / "data").rglob("*") if p.is_file()}
@@ -175,7 +193,12 @@ try:
     assert health["integrity"]["complete"] and not health["integrity"]["issues"]
     assert health["disk"]["available"] and health["write_failures_observed"]
     assert health["integrity"]["notes"] == 4
-    assert snapshot() == before, "online health changed stored bytes"
+    after_health = snapshot()
+    changed_health = sorted(name for name in set(before) | set(after_health) if before.get(name) != after_health.get(name))
+    # Session authentication reads SQLite: its SHM reader coordination bytes can
+    # change without changing durable data. Keep DB/WAL/Markdown/staging checks;
+    # offline inspect below still checks the entire tree byte-for-byte.
+    assert not [name for name in changed_health if name != 'memona.db-shm'], "online health changed durable stored bytes"
     inspect_args = [str(ROOT / "bin" / "memona"), "inspect", "-data-dir", str(work / "data")]
     busy = subprocess.run(inspect_args, capture_output=True, timeout=10)
     assert busy.returncode == 1 and not busy.stdout and b"writer active" in busy.stderr

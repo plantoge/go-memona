@@ -16,6 +16,11 @@ test('omitted flags and reordered relations are semantically unchanged', () => {
   assert.deepEqual(compareRevisionMetadata(before, { ...before, is_testing:false, is_project_summary:false, related_to:['a','b'], revision:2, content:'new body',updated_at:'later' }), []);
   assert.deepEqual(before.related_to, ['b','a']);
 });
+test('review timestamp and unresolved warning changes are visible independently of verified status', () => {
+  const before = {...note,kind:'knowledge',status:'verified'};
+  const after = {...before,verified_at:'2026-10-23T09:00:00Z',needs_review:true};
+  assert.deepEqual(compareRevisionMetadata(before,after).map(row=>row.label),['Waktu verifikasi','Perlu ditinjau']);
+});
 test('long values are bounded and marked, but equal prefixes do not hide change', () => {
   const rows = compareRevisionMetadata({...note,source:'x'.repeat(2001)}, {...note,source:'x'.repeat(2000)+'y'});
   assert.equal(rows.length, 1);

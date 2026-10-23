@@ -41,6 +41,7 @@ type App struct {
 	handler    http.Handler
 	workSlots  chan struct{}
 	keyLimits  *keyLimiter
+	security   *requestSecurity
 }
 type authenticatedKeyContext struct{}
 
@@ -101,6 +102,7 @@ func New(cfg Config, auth *access.Store, notes *memory.Store) (*App, error) {
 	u, _ := url.Parse(cfg.PublicURL)
 	a := &App{cfg: cfg, origin: u.Scheme + "://" + u.Host, host: u.Host, auth: auth, notes: notes, loginLimit: rate.NewLimiter(rate.Every(12*time.Second), 5), mcpLimit: rate.NewLimiter(30, 60), workSlots: make(chan struct{}, 8)}
 	a.keyLimits = newKeyLimiter(4096, 10, 20, 15*time.Minute)
+	a.security = newRequestSecurity()
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/login", a.login)
 	mux.Handle("/api/", a.admin(http.HandlerFunc(a.api)))
@@ -113,31 +115,7 @@ func New(cfg Config, auth *access.Store, notes *memory.Store) (*App, error) {
 	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, DisableLocalhostProtection: true, MaxRequestBodyBytes: 128 << 10})
 	// SDK localhost protection is replaced by an explicit configured Host allowlist
 	// below, so a legitimate tunnel Host is accepted without allowing arbitrary hosts.
-	mux.Handle("/mcp", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !a.mcpLimit.Allow() {
-			fail(w, 429, "request limit exceeded")
-			return
-		}
-		h := r.Header.Get("Authorization")
-		if !strings.HasPrefix(h, "Bearer ") {
-			fail(w, 401, "API key required")
-			return
-		}
-		k, e := a.auth.AuthenticateContext(r.Context(), strings.TrimPrefix(h, "Bearer "))
-		if e != nil {
-			if !readFailure(w, e) {
-				fail(w, 401, "invalid or expired API key")
-			}
-			return
-		}
-		if !a.keyLimits.Allow(k.ID, time.Now()) {
-			w.Header().Set("Retry-After", "1")
-			fail(w, 429, "API key request limit exceeded")
-			return
-		}
-		r = r.WithContext(context.WithValue(r.Context(), authenticatedKeyContext{}, k))
-		mh.ServeHTTP(w, r)
-	}))
+	mux.Handle("/mcp", a.secureMCP(mh))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("/", dashboardAsset)
 	a.handler = a.boundary(mux)
@@ -219,7 +197,8 @@ func decode(r *http.Request, v any) error {
 	return nil
 }
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
-	if !a.loginLimit.Allow() {
+	if !a.security.loginPeers.Allow(directPeer(r), time.Now()) || !a.loginLimit.Allow() {
+		a.security.limited.Add(1)
 		w.Header().Set("Retry-After", "12")
 		fail(w, 429, "Terlalu banyak percobaan. Tunggu lalu coba lagi.")
 		return
@@ -231,8 +210,17 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "Permintaan login tidak valid.")
 		return
 	}
-	token, csrf, e := a.auth.LoginContext(r.Context(), in.Password)
+	if !a.reserveAuthentication(w) {
+		return
+	}
+	token, csrf, e := func() (string, string, error) {
+		defer func() { <-a.security.authSlots }()
+		return a.auth.LoginContext(r.Context(), in.Password)
+	}()
 	if e != nil {
+		if errors.Is(e, access.ErrDenied) {
+			a.authenticationFailed(r.Context())
+		}
 		if readFailure(w, e) {
 			return
 		}
@@ -296,6 +284,8 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			"mcp_endpoint": strings.TrimRight(a.cfg.PublicURL, "/") + "/mcp",
 			"transport":    "Streamable HTTP",
 		})
+	case path == "request-security" && r.Method == "GET":
+		a.requestSecurityAPI(w)
 	case path == "storage-health" && r.Method == "GET":
 		report, err := a.notes.Health(r.Context())
 		if errors.Is(err, memory.ErrInspectBusy) {

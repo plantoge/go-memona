@@ -6,6 +6,9 @@ const MaxRelations = 20
 const MaxSummaryBytes = 8000
 
 func validateMetadata(in Input) error {
+	if err := validateReviewMetadata(in); err != nil {
+		return err
+	}
 	if err := validateSkillMetadata(in.Kind, in.SkillMetadata); err != nil {
 		return err
 	}
@@ -28,6 +31,7 @@ func validateMetadata(in Input) error {
 }
 
 func applyMetadata(n *Note, in Input) {
+	applyReviewMetadata(n, in)
 	if in.SkillMetadata != nil {
 		n.SkillMetadata = cloneSkillMetadata(in.SkillMetadata)
 	}

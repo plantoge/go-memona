@@ -2,6 +2,8 @@
 
 **Status:** kontrol berikut ditemukan pada source CLI/access/server yang ditinjau, disertai checklist audit. Peninjauan statis tidak sama dengan pentest atau bukti kontrol efektif saat runtime. Jangan membuka layanan ke publik sebelum kontrol berikut diuji pada build final.
 
+**Update 23 Oktober 2026:** budget valid/invalid MCP, peer/preauth, concurrency autentikasi, login peer, audit kegagalan sampled-redacted dan endpoint agregat admin telah diimplementasikan serta diuji otomatis. [Angka, urutan dan keterbatasan](request-security.md). Tidak mempercayai forwarded header; di belakang proxy semua klien dapat berbagi bucket peer. Retensi audit/monitoring pertumbuhan dan acceptance jaringan produksi masih pending, bukan jaminan DDoS atau izin exposure.
+
 ## Admin browser
 
 - Bootstrap pertama memerlukan `MEMONA_ADMIN_PASSWORD` minimal 16 karakter; tanpa nilai yang memenuhi syarat startup pada database baru harus gagal. Tidak ada kredensial default.

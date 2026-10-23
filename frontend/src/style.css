@@ -121,6 +121,8 @@ a { color: var(--accent); }
 .sidebar-closed .sidebar nav button, .sidebar-closed .sidebar-bottom button { justify-content: center; padding: 12px; }
 main { margin-left: calc(var(--sidebar-width) + 32px); max-width: 1800px; min-height: 100dvh; padding: 80px clamp(20px, 3vw, 48px) 40px; transition: margin-left 220ms ease; }
 main:focus { outline: none; }
+main.graph-workspace { max-width: none; padding: 72px 20px 18px; }
+@media (max-width: 760px) { main.graph-workspace { padding: 68px 10px 10px; } }
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
 .stat { padding: 20px 24px; }
 .stat p { color: var(--muted); font-size: .8rem; margin-bottom: 8px; }

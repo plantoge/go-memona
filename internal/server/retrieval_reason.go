@@ -14,6 +14,14 @@ type selectionReason struct {
 }
 
 func retrievalReason(ctx context.Context, n memory.Note, query string) (string, error) {
+	reason, err := baseRetrievalReason(ctx, n, query)
+	if err == nil && n.NeedsReview {
+		reason += " WARNING: explicitly marked needs_review; inspect unresolved uncertainty before relying on it."
+	}
+	return reason, err
+}
+
+func baseRetrievalReason(ctx context.Context, n memory.Note, query string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}

@@ -4,11 +4,21 @@ import type { Note, SkillMetadata } from './types';
 export interface NoteInput {
   project: string; kind: string; title: string; content: string; source: string; status: string;
   is_testing?: boolean;
+  verified_at?: string;
+  needs_review?: boolean;
   skill_metadata?: SkillMetadata;
 }
 export type NoteEditorErrors = Partial<Record<keyof NoteInput, string>>;
 const bytes = (value: string) => new TextEncoder().encode(value).length;
 const controls = /\p{Cc}/u;
+export function canonicalVerificationTime(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{0,8}[1-9])?Z$/.test(value)) return false;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
+}
+export function verificationTimeNow(): string {
+  return new Date().toISOString().replace(/\.([0-9]*?)0+Z$/, (_, digits: string) => digits ? `.${digits}Z` : 'Z');
+}
 
 export function initialNoteInput(note?: Note | null, project = ''): NoteInput {
   return {
@@ -16,6 +26,8 @@ export function initialNoteInput(note?: Note | null, project = ''): NoteInput {
     title: note?.title ?? '', content: note?.content ?? '', source: note?.source ?? '',
     status: note?.kind === 'skill' ? 'draft' : note?.status ?? 'unverified',
     ...(note?.is_testing ? { is_testing: true } : {}),
+    ...(note?.verified_at ? { verified_at: note.verified_at } : {}),
+    ...(note?.needs_review ? { needs_review: true } : {}),
     ...(note?.skill_metadata ? { skill_metadata: { trigger: note.skill_metadata.trigger || '', version: note.skill_metadata.version || '', test_evidence: note.skill_metadata.test_evidence || '', compatibility: [...(note.skill_metadata.compatibility || [])] } } : {}),
   };
 }
@@ -29,6 +41,10 @@ export function noteEditorErrors(input: NoteInput): NoteEditorErrors {
   if (bytes(input.source) > 2000 || controls.test(input.source)) errors.source = 'Sumber maksimal 2000 byte, tanpa karakter kontrol.';
   if (input.kind === 'skill' ? input.status !== 'draft' : !['unverified', 'verified'].includes(input.status)) errors.status = 'Skill harus berupa draf; catatan lain menggunakan belum diverifikasi atau terverifikasi.';
   if (input.status === 'verified' && !input.source.trim()) errors.source = 'Catatan terverifikasi memerlukan bukti di sumber.';
+  if (input.kind === 'skill' && (input.verified_at !== undefined || input.needs_review !== undefined)) errors.verified_at = 'Metadata verifikasi catatan bukan untuk skill.';
+  if (input.verified_at) {
+    if (input.status !== 'verified' || !canonicalVerificationTime(input.verified_at)) errors.verified_at = 'Gunakan waktu UTC RFC3339 berakhiran Z dengan status terverifikasi dan bukti sumber.';
+  }
   if (input.skill_metadata) {
     const m = input.skill_metadata;
     const texts = [m.trigger, m.version, m.test_evidence, ...m.compatibility];
@@ -40,7 +56,7 @@ export function noteEditorErrors(input: NoteInput): NoteEditorErrors {
 export function noteEditorInput(input: NoteInput): NoteInput {
   if (Object.keys(noteEditorErrors(input)).length) throw new Error('Periksa isian catatan yang tidak valid.');
   // Do not spread a Note here: relation/overview flags must remain omitted.
-  return { project: input.project, kind: input.kind, title: input.title, content: input.content, source: input.source, status: input.status, ...(typeof input.is_testing === 'boolean' ? { is_testing: input.is_testing } : {}), ...(input.skill_metadata ? { skill_metadata: { ...input.skill_metadata, compatibility: [...input.skill_metadata.compatibility] } } : {}) };
+  return { project: input.project, kind: input.kind, title: input.title, content: input.content, source: input.source, status: input.status, ...(typeof input.is_testing === 'boolean' ? { is_testing: input.is_testing } : {}), ...(input.verified_at !== undefined ? { verified_at: input.verified_at } : {}), ...(typeof input.needs_review === 'boolean' ? { needs_review: input.needs_review } : {}), ...(input.skill_metadata ? { skill_metadata: { ...input.skill_metadata, compatibility: [...input.skill_metadata.compatibility] } } : {}) };
 }
 
 export interface ComparedLine { number: number; before: string | null; after: string | null; changed: boolean }

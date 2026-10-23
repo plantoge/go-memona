@@ -6,6 +6,7 @@ export interface Note {
   is_project_summary?: boolean; is_testing?: boolean; related_to?: string[]; supersedes?: string[];
   connections?: Connections;
   skill_metadata?: SkillMetadata;
+  verified_at?: string; needs_review?: boolean;
 }
 export interface NoteReference { id: string; title: string; project: string; kind: string; archived: boolean }
 export interface Connections {

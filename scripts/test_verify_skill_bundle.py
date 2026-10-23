@@ -102,6 +102,30 @@ class VerifyBundleTests(unittest.TestCase):
         path.write_bytes(b'{"format":1,"format":2}')
         self.refused()
 
+    def test_payload_permissions_and_frontmatter_checked_independently(self):
+        skill = self.output / 'SKILL.md'
+        skill.chmod(0o644)
+        self.refused()
+        skill.chmod(0o700)
+        self.refused()
+        skill.chmod(0o600)
+        # Even a matching digest does not allow a nonportable skill header.
+        skill.write_bytes(b'not portable frontmatter')
+        path = self.output / 'manifest.json'
+        manifest = json.loads(path.read_bytes())
+        manifest['files']['SKILL.md'] = {'bytes':skill.stat().st_size,
+                                       'sha256':hashlib.sha256(skill.read_bytes()).hexdigest()}
+        path.write_text(json.dumps(manifest))
+        self.refused()
+
+    def test_cli_success_reports_only_aggregate_integrity(self):
+        result = subprocess.run([sys.executable,'-B',str(ROOT / 'scripts/verify_skill_bundle.py'),
+                                 '--bundle',str(self.output)],capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('PASS: 2 payload files', result.stdout)
+        self.assertNotIn('a'*32, result.stdout)
+        self.assertNotIn(str(self.output), result.stdout)
+
     def test_cli_generic_failure_without_private_name(self):
         result = subprocess.run([sys.executable,'-B',str(ROOT / 'scripts/verify_skill_bundle.py'),
                                  '--bundle',str(self.work / 'SYNTHETIC_PRIVATE_MISSING')],

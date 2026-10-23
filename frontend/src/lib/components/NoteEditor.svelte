@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import { kindLabels, statusLabel, type Note, type DuplicateCandidate } from '../types';
-  import { initialNoteInput, noteEditorErrors, noteEditorInput, type NoteInput, type NoteEditorErrors } from '../note-editor';
+  import { initialNoteInput, noteEditorErrors, noteEditorInput, verificationTimeNow, type NoteInput, type NoteEditorErrors } from '../note-editor';
 
   let { note = null, project = '', saving = false, onsubmit, oncancel, onduplicates }: {
     note?: Note | null; project?: string; saving?: boolean;
@@ -34,7 +34,7 @@
   onMount(() => { editorHeading?.focus(); });
   const busy = $derived(saving || pending);
   const fields: ('project' | 'kind' | 'title' | 'content' | 'source' | 'status')[] = ['project', 'kind', 'title', 'content', 'source', 'status'];
-  const labels: Record<keyof NoteInput, string> = { project: 'Proyek', kind: 'Jenis', title: 'Judul', content: 'Isi Markdown', source: 'Sumber / bukti', status: 'Status', is_testing: 'Catatan testing', skill_metadata: 'Metadata skill' };
+  const labels: Record<keyof NoteInput, string> = { project: 'Proyek', kind: 'Jenis', title: 'Judul', content: 'Isi Markdown', source: 'Sumber / bukti', status: 'Status', is_testing: 'Catatan testing', skill_metadata: 'Metadata skill', verified_at: 'Waktu verifikasi', needs_review: 'Perlu review' };
   const fieldID = (field: string) => `${uid}-${field}`;
   async function save(event: SubmitEvent) {
     event.preventDefault();
@@ -58,7 +58,7 @@
     <div class="inline-error" role="alert" tabindex="-1" bind:this={errorBox!}>
       <strong>Catatan belum disimpan.</strong>
       {#if failure}<p>{failure}</p>{/if}
-      <ul>{#each fields.filter(field => errors[field]) as field}<li><a href={`#${fieldID(field)}`}>{labels[field]}: {errors[field]}</a></li>{/each}{#if errors.skill_metadata}<li>Metadata skill: {errors.skill_metadata}</li>{/if}</ul>
+      <ul>{#each fields.filter(field => errors[field]) as field}<li><a href={`#${fieldID(field)}`}>{labels[field]}: {errors[field]}</a></li>{/each}{#if errors.skill_metadata}<li>Metadata skill: {errors.skill_metadata}</li>{/if}{#if errors.verified_at}<li><a href={`#${fieldID('verified_at')}`}>Waktu verifikasi: {errors.verified_at}</a></li>{/if}</ul>
     </div>
   {/if}
   <fieldset disabled={busy}>
@@ -66,11 +66,11 @@
       <div class="editor-field">
         <label for={fieldID(field)}>{labels[field]}{field === 'project' || field === 'kind' || field === 'title' || field === 'status' ? ' (wajib)' : ''}</label>
         {#if field === 'kind'}
-          <select id={fieldID(field)} bind:value={input.kind} disabled={!!note} aria-invalid={errors[field] ? true : undefined} aria-describedby={errors[field] ? `${fieldID(field)}-error` : undefined} onchange={() => { input.status = input.kind === 'skill' ? 'draft' : 'unverified'; if (input.kind !== 'skill') delete input.skill_metadata; }}>
+          <select id={fieldID(field)} value={input.kind} disabled={!!note} aria-invalid={errors[field] ? true : undefined} aria-describedby={errors[field] ? `${fieldID(field)}-error` : undefined} onchange={event => { input.kind = event.currentTarget.value; input.status = input.kind === 'skill' ? 'draft' : 'unverified'; if (input.kind !== 'skill') { delete input.skill_metadata; if (input.verified_at !== undefined) input.verified_at = ''; } else { delete input.verified_at; delete input.needs_review; } }}>
             {#each Object.entries(kindLabels) as [value, label]}<option {value}>{label}</option>{/each}
           </select>
         {:else if field === 'status'}
-          <select id={fieldID(field)} bind:value={input.status} aria-invalid={errors[field] ? true : undefined} aria-describedby={errors[field] ? `${fieldID(field)}-error` : undefined}>
+          <select id={fieldID(field)} value={input.status} onchange={event => { input.status = event.currentTarget.value; if (input.status !== 'verified' && input.verified_at !== undefined) input.verified_at = ''; }} aria-invalid={errors[field] ? true : undefined} aria-describedby={errors[field] ? `${fieldID(field)}-error` : undefined}>
             {#each input.kind === 'skill' ? ['draft'] : ['unverified', 'verified'] as status}<option value={status}>{statusLabel(status)}</option>{/each}
           </select>
         {:else if field === 'content'}
@@ -93,6 +93,15 @@
       {/if}
       {#if errors.skill_metadata}<p class="inline-error" role="alert">{errors.skill_metadata}</p>{/if}
       <p class="hint">Metadata adalah pernyataan penulis, bukan hasil uji otomatis. Mengedit skill aktif selalu mengembalikannya ke draf.</p>
+    </section>{/if}
+    {#if input.kind !== 'skill'}<section aria-label="Review pengetahuan"><h4>Review pengetahuan</h4>
+      <label class="testing-check"><input type="checkbox" checked={!!input.needs_review} onchange={e => input.needs_review = e.currentTarget.checked}> Perlu ditinjau / ada keraguan yang belum selesai</label>
+      <label for={fieldID('verified_at')}>Waktu verifikasi yang dinyatakan penulis (UTC)</label>
+      <input id={fieldID('verified_at')} value={input.verified_at || ''} placeholder="2026-10-23T09:00:00Z" disabled={input.status !== 'verified'} oninput={e => input.verified_at = e.currentTarget.value} aria-invalid={errors.verified_at ? true : undefined} aria-describedby={`${uid}-verification-help`}>
+      {#if input.status === 'verified'}<button type="button" class="secondary" onclick={() => input.verified_at = verificationTimeNow()}>Catat waktu sekarang setelah pemeriksaan</button>{/if}
+      {#if input.verified_at}<button type="button" class="secondary" onclick={() => input.verified_at = ''}>Kosongkan waktu verifikasi</button>{/if}
+      {#if errors.verified_at}<p class="inline-error" role="alert">{errors.verified_at}</p>{/if}
+      <p class="hint" id={`${uid}-verification-help`}>Waktu ini deklarasi penulis, bukan pemeriksaan otomatis, dan tidak diperbarui otomatis ketika isi berubah. Periksa ulang sumber atau kosongkan waktunya setelah perubahan substansial. Perlu review tetap terlihat dalam retrieval; gunakan sumber dan relasi menggantikan secara eksplisit untuk keputusan yang bertentangan.</p>
     </section>{/if}
     <label class="testing-check"><input type="checkbox" checked={!!input.is_testing} onchange={e => input.is_testing = e.currentTarget.checked}> Catatan testing / sintetis (dikecualikan dari context default)</label>
     <p class="hint">Terverifikasi memerlukan bukti pada sumber; ini bukan verifikasi otomatis oleh Memona.</p>

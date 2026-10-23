@@ -5,9 +5,17 @@ Status: backlog; pengguna meminta pengerjaan menyeluruh pada source/test. Operas
 
 ## Checkpoint integrasi lanjutan
 
+**Optimasi graph adaptif 23 Oktober2026 — OpenCode:** kualitas otomatis Ringan untuk>100node/>300edge, DPR1/resolution6, link garis tipis, panah active-only, label active-only/opt-in24–48 terdekat dengan scheduler12.5–20Hz, simulasi pendek dan static reduced-motion. Seluruh500node tetap tersedia; tidak ada kelompok/edge yang dibuang. Perbaikan paused data-sync/reset ikut dilakukan. Frontend55test/check/build, Go test/vet/build dan final smoke lulus; FPS/browser belum terukur. Tidak ada restart atau dependency baru. Lihat [bukti](verification.md) dan [kontrak](frontend.md).
+
+**Revisi graph-first 23 Oktober 2026 — OpenCode:** permintaan pengguna memusatkan halaman pada kanvas besar, filter ringkas/popover dan ikon kontrol jeda/zoom/reset. Inspector/penjelajah serta bagian kontrol kamera tanpa gesture dihilangkan. Klik node membuka dialog berisi konten sebelum metadata; renderer dijeda selama dialog. Keyboard/pencarian serta fallback pemilih memori tetap tersedia tanpa daftar permanen. Tidak mengubah data contoh, relasi, API atau dependency. Build/test dan batas acceptance dicatat pada [verifikasi](verification.md); tidak ada persetujuan restart baru.
+
+**Graph 3D 23 Oktober 2026 — OpenCode:** pengguna memilih `vasturiano/3d-force-graph` setelah usulan Three.js dan menyetujui dependency lokal. Increment UI mempertahankan relasi/API, filter/inspector/daftar, menambah drag node/force layout, jeda dan reduced-motion. Tidak mengubah struktur menjadi pohon atau mengaktifkan DAG. Pekerjaan ini tidak mencakup restart/deployment; acceptance WebGL/browser tetap terpisah. Final source memakai `3d-force-graph@1.80.1`; 44 test frontend, Svelte check/build, Go test/vet/build dan binary smoke lulus. Chunk lazy 373.36 kB gzip dengan warning ukuran Vite; style-injection opsional upstream berpotensi diblokir CSP (CSP tidak dilonggarkan). Browser/GPU acceptance tetap belum dilakukan. Kontrak dan bukti final pada [frontend](frontend.md) serta [verifikasi](verification.md).
+
+**Permintaan 23 Oktober 2026 — SEC-02/QUAL-02:** pengguna melaporkan sudah menguji OpenCode dan menyiapkan Git; Git tersedia dengan perubahan lokal yang dipertahankan. Uji Hermes/harness lain tidak disimpulkan dari keberhasilan OpenCode. Aktivasi binary belum dilakukan. Pengerjaan saat ini hanya rate-limit/audit keamanan dan metadata review/verifikasi, bukan instalasi service (OPS-01), HTTPS publik atau perubahan data aktif.
+
 **Update 23 Oktober 2026 — metadata/retrieval/skill:** `is_testing` eksplisit tersedia pada penyimpanan immutable, MCP dan editor; revise omission mempertahankan, false membersihkan. Context default mengecualikannya tanpa mengubah hak search/read. `selection_reasons` menjelaskan setiap ID; batas 24000 byte sekarang menghitung seluruh JSON terstruktur termasuk guidance/alasan. Tool MCP read-only `find_duplicate_candidates` tersedia (11 tool total), berizin satu proyek, maksimal 10 metadata tanpa merge. Metadata skill opsional trigger/version/compatibility/test_evidence tersedia, preserve/clear dan receipt backward-compatible; deklarasi penulis bukan test otomatis. Editor/detail/diff metadata serta exporter teks terhubung. Graph diperbaiki untuk fokus/pointer/RAF/reduced-motion. Semua ini tetap source lokal, tidak diaktifkan pada layanan pengguna.
 
-**Update bundle/resource/evaluasi:** exporter bundle offline baru mendukung references teks dan assets raster dengan input eksplisit, descriptor pinning, review wajib, checksum, output baru privat, batas 32 file/256KiB/2MiB dan tanpa scripts/install/overwrite/cleanup. 16 test bundle + 7 test verifier read-only + 47 test Python sebelumnya lulus (70 total). Verifier memeriksa tree tepat dan checksum tanpa repair/install. Benchmark 8 pembaca bersamaan dan profil histori lebih besar tercatat dalam [pengukuran](resource-benchmark-2026-10.md), bukan kapasitas maksimum/RSS/deadline keras. Evaluasi semantic sintetis menemukan 5/9 pasangan relevan terambil (fixture sengaja kecil, bukan korpus pengguna); embedding belum dipilih/dipanggil. Lihat [evaluasi](semantic-search-evaluation.md) dan [bundle](skill-bundles.md). RET-01/REL-05 tetap tertahan pada kontrak integritas/pinning; metadata waktu review QUAL-02, formal review state, acceptance browser/harness dan operasi aktif masih terbuka. Entri checkpoint di bawah bersifat historis bila bertentangan dengan update ini.
+**Update bundle/resource/evaluasi:** exporter bundle offline baru mendukung references teks dan assets raster dengan input eksplisit, descriptor pinning, review wajib, checksum, output baru privat, batas 32 file/256KiB/2MiB dan tanpa scripts/install/overwrite/cleanup. 16 test bundle + 9 test verifier read-only + 47 test Python sebelumnya lulus (72 total). Verifier memeriksa tree tepat dan checksum tanpa repair/install. Benchmark 8 pembaca bersamaan dan profil histori lebih besar tercatat dalam [pengukuran](resource-benchmark-2026-10.md), bukan kapasitas maksimum/RSS/deadline keras. Evaluasi semantic sintetis menemukan 5/9 pasangan relevan terambil (fixture sengaja kecil, bukan korpus pengguna); embedding belum dipilih/dipanggil. Lihat [evaluasi](semantic-search-evaluation.md) dan [bundle](skill-bundles.md). RET-01/REL-05 tetap tertahan pada kontrak integritas/pinning; metadata waktu review QUAL-02, formal review state, acceptance browser/harness dan operasi aktif masih terbuka. Entri checkpoint di bawah bersifat historis bila bertentangan dengan update ini.
 
 **Update RET-02 kuota/evaluasi:** mixed `get_context` maksimal dua handoff yang berhasil dimasukkan, dengan `truncated=true` bila kandidat layak dilewati karena kuota; `kind=handoff` eksplisit tidak terkena kuota tersebut (batas 12/24000 byte tetap). Guidance menjelaskan ranking/kuota dan tidak mengklaim deteksi testing otomatis. Evaluasi sintetis melalui transport MCP aktual menguji query Indonesia dan identifier kode, overview, keputusan, global berizin, pengecualian private/superseded, batas output serta override handoff. Go test/race/vet/build dan smoke sintetis lulus. Ini bukan penutupan RET-02: label testing terstruktur, dataset representatif pengguna, relevansi per-item dan RET-01 masih terbuka.
 
@@ -45,7 +53,7 @@ Pengguna mempertimbangkan Memona sebagai SaaS di masa depan. Diskusi disimpan di
 
 ### DEV-01 — Baseline version control — P0
 
-- [ ] Periksa apakah repository sudah tersedia; bila belum, usulkan inisialisasi dan baseline versi pertama.
+- [x] Periksa apakah repository sudah tersedia; Git tersedia pada 23 Oktober 2026, pengguna melaporkan sudah menyiapkannya. Status/diff diperiksa; baseline/commit tidak dibuat agen.
 - [ ] Verifikasi ignore terhadap data, key, konfigurasi runtime, cache, binary, dan fixture.
 - [ ] Buat commit/tag hanya setelah diminta atau disetujui secara eksplisit.
 
@@ -205,8 +213,10 @@ Pengguna mempertimbangkan Memona sebagai SaaS di masa depan. Diskusi disimpan di
 
 ### QUAL-02 — Konflik, penggantian dan informasi usang — P1
 
+**Update 23 Oktober 2026:** field verified_at/needs_review tersedia pada immutable store, MCP dan editor/detail/list/filter lokal/diff. Waktu hanya untuk status verified dengan sumber bukti, UTC kanonis; flag review independen dan context memberi WARNING tanpa menyembunyikan catatan. Omission preserve, clear eksplisit, status keluar verified menghapus waktu warisan; edit isi saat tetap verified tidak memperbarui waktu otomatis. Status/jenis/sumber dan supersedes tetap eksplisit, tidak ada inferensi konflik semantik atau last-write-wins kebenaran. Test storage/HTTP/MCP/UI helpers lulus; acceptance browser increment ini pending. Review state formal/reviewer dan deteksi pertentangan otomatis bukan implementasi ini.
+
 - [x] Tambahkan relasi supersedes eksplisit; lihat MEM-01 untuk implementasi dan batas.
-- [ ] Tambahkan waktu verifikasi/perlu review (belum termasuk MEM-01).
+- [x] Tambahkan waktu verifikasi/perlu review (QUAL-02, 23 Oktober 2026; [kontrak](review-metadata.md), deklarasi penulis bukan verifikasi otomatis).
 - [ ] Bedakan keputusan pengguna, bukti terverifikasi, dan kesimpulan sementara.
 - [ ] Tampilkan konflik untuk ditinjau; jangan menerapkan last-write-wins untuk kebenaran informasi.
 
@@ -261,9 +271,11 @@ Pengguna mempertimbangkan Memona sebagai SaaS di masa depan. Diskusi disimpan di
 
 ### SEC-02 — Rate limit dan audit autentikasi — P0 sebelum exposure publik
 
-- [ ] Tambahkan batas per-key serta pemisahan anggaran request valid/invalid, tetap dengan proteksi global.
-- [ ] Jangan mempercayai header forwarded IP tanpa proxy tepercaya.
-- [ ] Audit kegagalan login/key tanpa token/password/isi sensitif; tentukan retensi dan pertumbuhan audit.
+**Update 23 Oktober 2026:** source/test security selesai untuk increment ini: peer/preauth, invalid, authenticated key dan shared budget dipisah; per-key sebelum shared valid, dua slot auth di dalam delapan slot global, login peer+aggregate, audit fixed-redacted sampling dan counter admin `/api/request-security`. Go test/race/vet/build, 40 frontend tests/build, 72 Python tests serta binary/recovery smoke lulus. Fairness bukan jaminan DDoS: proxy peer/distributed flood/preauth/table penuh tetap dapat menolak request valid. Retensi/growth audit append-only dan uji proxy/jaringan produksi masih terbuka, tanpa auto-delete atau deployment. Lihat [kontrak keamanan request](request-security.md).
+
+- [x] Tambahkan batas per-key serta pemisahan anggaran request valid/invalid, tetap dengan proteksi global (23 Oktober 2026, test sintetis fairness/admission/revoke/expiry).
+- [x] Jangan mempercayai header forwarded IP tanpa proxy tepercaya (hanya RemoteAddr, canonical IP; spoof tests lulus).
+- [ ] Audit kegagalan login/key tanpa token/password/isi sensitif; tentukan retensi dan pertumbuhan audit (source sampling/counter disiapkan; retensi operasional tanpa auto-purge masih perlu keputusan).
 
 **Selesai bila:** satu klien tidak mudah menghabiskan seluruh anggaran klien sah, revoke/expiry tetap langsung berlaku, dan log bebas secret.
 

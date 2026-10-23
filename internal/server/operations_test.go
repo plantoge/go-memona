@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"memona/internal/access"
@@ -259,8 +260,25 @@ func TestMCPOperationTimeoutAfterCommitAndConcurrentRetry(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
 		wg.Go(func() {
-			r, err := session.CallTool(t.Context(), &mcp.CallToolParams{Name: "save_memory", Arguments: operationArgs()})
-			if err != nil || r.IsError {
+			// Admission can reject simultaneous authentication before a tool
+			// executes. Retry the SAME operation/payload through the real HTTP
+			// client on 503, retaining four concurrent callers and production caps.
+			var r *mcp.CallToolResult
+			var err error
+			for attempt := 0; attempt < 4; attempt++ {
+				r, err = session.CallTool(t.Context(), &mcp.CallToolParams{Name: "save_memory", Arguments: operationArgs()})
+				if err == nil || !strings.Contains(err.Error(), "Service Unavailable") {
+					break
+				}
+				timer := time.NewTimer(time.Second)
+				select {
+				case <-timer.C:
+				case <-t.Context().Done():
+					timer.Stop()
+					return
+				}
+			}
+			if err != nil || r == nil || r.IsError {
 				t.Errorf("concurrent retry failed: %v", err)
 				return
 			}

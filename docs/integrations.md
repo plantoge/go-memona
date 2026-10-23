@@ -18,6 +18,7 @@ Panduan agen dapat dibaca melalui `get_memory_guide({})` atau resource `memona:/
 | `save_handoff` | `write` | Menyimpan keadaan akhir sesi dan langkah selanjutnya |
 | `archive_memory` | `archive` | Mengarsipkan, bukan hard delete; konflik versi diperiksa |
 | `get_skill` | `read` | Mengambil objek catatan skill berstatus `active`, nonarsip, berdasarkan ID |
+| `find_duplicate_candidates` | `read` | Maksimal sepuluh metadata kandidat leksikal satu proyek eksplisit; tanpa merge/write |
 
 ### Argumen sesuai source saat ini
 
@@ -26,15 +27,22 @@ Skema SDK diturunkan dari struct di `internal/server/mcp.go` dan `memory.Input`.
 | Tool | Field wajib | Field opsional / perilaku |
 | --- | --- | --- |
 | `search_memory` | Tidak ada | `project`, `query`, `kind`, `limit`; project kosong mencari semua proyek yang diizinkan. Limit 1–50, selain itu default 20. |
-| `get_context` | Tidak ada | `project`, `query`, `kind`, `limit`; project kosong berarti `global`. Limit 1–12, default 12; anggaran objek catatan JSON 24.000 byte. Ringkasan diprioritaskan dan melewati filter query, tetapi tidak kind. Catatan digantikan nonarsip dikecualikan. |
+| `get_context` | Tidak ada | `project`, `query`, `kind`, `limit`, `include_testing`; project kosong berarti `global`. Limit 1–12, default 12; anggaran seluruh hasil JSON terstruktur 24.000 byte termasuk guidance/selection_reasons. Testing eksplisit dikecualikan default; mixed maksimal dua handoff, kind=handoff mengabaikan kuota kategori. Ringkasan diprioritaskan dan melewati filter query, tetapi tidak kind. Catatan digantikan nonarsip dikecualikan. |
 | `read_memory`, `get_skill`, `get_memory_relations` | `id` | Tidak menerima nomor revisi historis. Read/skill menyertakan `connections`; relations hanya referensi. |
 | `save_memory`, `save_handoff` | `project`, `kind`, `title`, `content`, `status`, `source` | `save_handoff` tetap memakai skema penuh, lalu memaksa kind menjadi `handoff`. |
 | `revise_memory` | `id`, `expected_revision`, dan keenam field `memory.Input` di atas | Penggantian lengkap, bukan patch parsial; memeriksa scope proyek asal dan tujuan. |
 | `archive_memory` | `id`, `expected_revision` | Tidak menerima isi pengganti. |
+| `find_duplicate_candidates` | `project`, `title`, `content` | `exclude_id` opsional; proyek eksplisit wajib berizin read, maksimum sepuluh metadata nonarsip, bukan probabilitas duplicate. |
 
 Keenam field inti `memory.Input` wajib hadir pada skema meskipun `source` boleh berupa string kosong untuk status selain `verified`; `content` juga boleh kosong. `project` harus cocok `^[a-z0-9][a-z0-9-]{0,63}$`, judul wajib tidak kosong (maksimum 200 byte), konten maksimum 64 KiB, dan sumber maksimum 2.000 byte. Jenis storage: `fact`, `decision`, `knowledge`, `handoff`, `skill`. Status input: `unverified`, `verified`, atau `draft`; `verified` memerlukan sumber tidak kosong. Skill baru wajib `draft`. Status `active` hanya hasil publish admin; revisi skill aktif kembali draft.
 
 Field **opsional**: `is_project_summary`, `related_to`, `supersedes`. Saat revise, field yang tidak dikirim dipertahankan; `false`/`[]` mengosongkannya. Penetapan metadata memerlukan read+write. Ringkasan hanya knowledge, maks. 8000 byte, satu nonarsip per proyek. Target relasi harus nyata dalam proyek yang sama, unik, maks. 20 per jenis; diri sendiri/siklus supersedes ditolak. Backlink turunan hanya dari sumber nonarsip dan dibatasi. Search menyertakan `superseded_by`; read/skill/context memakai `connections`. Lihat [kontrak relasi](memory-relations.md), termasuk batas rollback format.
+
+**Acceptance pengguna 23 Oktober 2026:** OpenCode dilaporkan sudah dicoba. Hasil ini tidak membuktikan versi Hermes/harness lain, browser seluruh fitur atau aktivasi binary increment terbaru.
+
+Metadata review opsional non-skill: `verified_at` waktu UTC RFC3339Nano kanonis yang dinyatakan penulis (status verified + source evidence), `needs_review` flag keraguan eksplisit. Omission mempertahankan; string kosong/false membersihkan; keluar dari verified menghapus waktu warisan. Search/read/context menampilkannya, context memberi warning tanpa menyelesaikan konflik berdasarkan recency. [Kontrak lengkap](review-metadata.md).
+
+Metadata tambahan opsional: `is_testing` boolean (omission revise mempertahankan, false membersihkan) dan `skill_metadata` khusus skill (trigger/version/compatibility/test_evidence; omission mempertahankan, objek kosong membersihkan). Lihat [testing](testing-metadata.md) dan [metadata skill](skill-metadata.md) untuk batas byte/rollback. Tidak ada klasifikasi otomatis atau bukti test yang diverifikasi server.
 
 Respons catatan memiliki `revision`; gunakan nilainya sebagai `expected_revision` pada mutasi berikutnya. Tidak ada alias field versi lain, tool hard delete, tool publish admin, atau eksekusi skrip.
 
@@ -44,7 +52,7 @@ Empat mutation tool `save_memory`/`save_handoff`/`revise_memory`/`archive_memory
 
 Setelah upgrade relasi, respons memiliki metadata dan `connections` yang belum ada pada kontrak lama. Bila harness melaporkan `Structured content does not match the tool's output schema` atau `additional properties`, bandingkan discovery `tools/list` dari endpoint/build yang benar dengan skema yang dikenali harness. Katalog delapan tool tanpa `get_memory_relations`/`get_memory_guide` dapat menunjukkan kontrak lama, bukan bukti pasti bug server. Reconnect MCP atau mulai sesi baru sesuai mekanisme harness untuk memperbarui discovery; jangan menonaktifkan validasi atau mengubah data/secret untuk menyiasatinya. Pastikan dulu binary yang dimaksud sudah diaktifkan dengan persetujuan; reconnect saja tidak mengganti binary server.
 
-`TestMCPDiscoveredOutputSchemas` memvalidasi structured output sepuluh tool terhadap skema runtime `tools/list`, termasuk hasil kosong, metadata, hubungan dan mutasi sintetis. Test lokal ini lulus, tetapi bukan bukti bahwa cache/koneksi OpenCode atau Hermes pengguna telah diperbarui. Reconnect/acceptance nyata tetap dicatat terpisah.
+`TestMCPDiscoveredOutputSchemas` memvalidasi structured output sebelas tool terhadap skema runtime `tools/list`, termasuk hasil kosong, metadata, hubungan dan mutasi sintetis. Test lokal ini lulus, tetapi bukan bukti bahwa cache/koneksi OpenCode atau Hermes pengguna telah diperbarui. Reconnect/acceptance nyata tetap dicatat terpisah.
 
 Contoh **arguments** untuk `save_memory` (bukan envelope JSON-RPC):
 

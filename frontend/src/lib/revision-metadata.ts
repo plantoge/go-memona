@@ -8,6 +8,8 @@ export function compareRevisionMetadata(before: Note, after: Note): MetadataChan
     ['Judul', n => n.title], ['Sumber / bukti', n => n.source], ['Status', n => n.status],
     ['Arsip', n => String(n.archived)], ['Testing', n => String(!!n.is_testing)],
     ['Ringkasan proyek', n => String(!!n.is_project_summary)],
+    ['Waktu verifikasi', n => n.verified_at || ''],
+    ['Perlu ditinjau', n => String(!!n.needs_review)],
     ['Terkait dengan', n => [...(n.related_to || [])].sort().join(', ')],
     ['Menggantikan', n => [...(n.supersedes || [])].sort().join(', ')],
     ['Pemicu skill', n => n.skill_metadata?.trigger || ''],

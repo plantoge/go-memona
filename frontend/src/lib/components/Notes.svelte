@@ -15,11 +15,12 @@
   let after = $state('');
   let before = $state('');
   let hideTesting = $state(false);
+  let onlyNeedsReview = $state(false);
   let visible = $derived(notes.filter(n =>
     (archive === 'all' || n.archived === (archive === 'archived')) &&
     (!statusFilter || n.status === statusFilter) && (!author || n.author.toLocaleLowerCase().includes(author.toLocaleLowerCase())) &&
     (!after || n.updated_at.slice(0, 10) >= after) && (!before || n.updated_at.slice(0, 10) <= before) &&
-    (!hideTesting || !n.is_testing)
+    (!hideTesting || !n.is_testing) && (!onlyNeedsReview || !!n.needs_review)
   ));
   let timer: ReturnType<typeof setTimeout>;
   function search() { clearTimeout(timer); onsearch(query.trim(), project, skills ? 'skill' : kind); }
@@ -46,6 +47,7 @@
       <label>Penulis<input bind:value={author} maxlength="200" placeholder="Nama/identitas penulis"></label>
       <label>Diperbarui mulai<input type="date" bind:value={after}></label>
       <label>Sampai<input type="date" bind:value={before}></label>
+      <label><input type="checkbox" bind:checked={onlyNeedsReview}> Hanya perlu ditinjau</label>
       <label><input type="checkbox" bind:checked={hideTesting}> Sembunyikan catatan berlabel testing</label>
     </div>
     <p class="hint">Filter ini hanya memeriksa maksimal 500 hasil yang dimuat. Label testing eksplisit dari penulis; catatan lama tidak diklasifikasikan otomatis.</p>
@@ -56,7 +58,7 @@
     {:else if !visible.length}<p class="empty-state">Belum ada memori yang cocok. Coba kata kunci atau filter lain.</p>
     {:else}{#each visible as note (note.id)}
       <article class="note-card">
-        <div class="badges"><span class="badge">{note.project}</span><span class="badge neutral">{kindLabels[note.kind] || note.kind}</span>{#if note.is_project_summary}<span class="badge">Ringkasan proyek</span>{/if}{#if note.connections?.superseded_by.length}<span class="badge neutral">Sudah digantikan</span>{/if}{#if note.archived}<span class="badge neutral">Diarsipkan</span>{/if}{#if note.is_testing}<span class="badge neutral">Testing</span>{/if}</div>
+        <div class="badges"><span class="badge">{note.project}</span><span class="badge neutral">{kindLabels[note.kind] || note.kind}</span>{#if note.is_project_summary}<span class="badge">Ringkasan proyek</span>{/if}{#if note.connections?.superseded_by.length}<span class="badge neutral">Sudah digantikan</span>{/if}{#if note.archived}<span class="badge neutral">Diarsipkan</span>{/if}{#if note.is_testing}<span class="badge neutral">Testing</span>{/if}{#if note.needs_review}<span class="badge neutral">Perlu ditinjau</span>{/if}</div>
         <h3><button type="button" class="note-link" onclick={() => onopen(note.id)}>{note.title || 'Tanpa judul'}</button></h3>
         <p class="note-excerpt">{note.content.slice(0, 180)}</p>
         <p class="card-meta">{statusLabel(note.status)} · Revisi {note.revision} · {date(note.updated_at)}</p>

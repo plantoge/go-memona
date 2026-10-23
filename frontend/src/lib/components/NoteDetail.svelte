@@ -5,8 +5,8 @@
   import NoteEditor from './NoteEditor.svelte';
   import { compareNoteLines, type NoteInput } from '../note-editor';
   import { compareRevisionMetadata } from '../revision-metadata';
-  let { detail, loading, saving, error, onclose, onchange, onopen, onsaveconnections, onsavecontent = undefined, onduplicates, onhistory, onrestoreskill }: {
-    detail: NoteDetail | null; loading: boolean; saving: boolean; error: string;
+  let { detail, loading, saving, error, contentFirst = false, onclose, onchange, onopen, onsaveconnections, onsavecontent = undefined, onduplicates, onhistory, onrestoreskill }: {
+    detail: NoteDetail | null; loading: boolean; saving: boolean; error: string; contentFirst?: boolean;
     onclose: () => void; onchange: (action: 'archive' | 'restore' | 'publish') => void;
     onopen: (id: string) => void; onsaveconnections: (input: ConnectionInput) => Promise<boolean>;
     onsavecontent?: (input: NoteInput) => Promise<boolean>;
@@ -69,8 +69,14 @@
   {#if detail && !loading}
     {@const note = detail.note}
     {#if note.is_project_summary}<p class="badge">Ringkasan proyek · diprioritaskan dalam konteks</p>{/if}
+    {#if note.needs_review}<p class="inline-error" role="status">Perlu ditinjau: penulis menandai keraguan atau review yang belum selesai. Jangan anggap status terverifikasi sebagai penyelesaian keraguan ini.</p>{/if}
+    {#if note.verified_at}<p class="hint">Waktu verifikasi yang dinyatakan penulis: {date(note.verified_at)}. Bukan pemeriksaan otomatis.</p>{/if}
     {#if note.is_testing}<p class="badge">Testing / sintetis · tidak dimasukkan ke context default</p>{/if}
     {#if note.connections?.superseded_by.length}<p class="inline-error" role="status">Catatan ini sudah digantikan. Lihat penggantinya di bawah; catatan ini tidak dimasukkan ke get_context.</p>{/if}
+    {#if contentFirst}<article class="prose" aria-label="Isi memori">
+      <!-- Same authenticated goldmark safe-mode output as the standard detail. -->
+      {#if detail.html.trim()}{@html detail.html}{:else}<p>Memori ini belum memiliki isi.</p>{/if}
+    </article>{/if}
     <dl class="metadata">
       {#each Object.entries({ ID: note.id, Proyek: note.project, Jenis: kindLabels[note.kind] || note.kind, [note.kind === 'skill' ? 'Publikasi skill' : 'Verifikasi']: statusLabel(note.status), Pengarsipan: note.archived ? 'Diarsipkan' : 'Tidak diarsipkan', Sumber: note.source, Penulis: note.author, Revisi: note.revision, Dibuat: date(note.created_at), Diperbarui: date(note.updated_at) }) as [label, value]}
         <div><dt>{label}</dt><dd>{value || '—'}</dd></div>
@@ -87,10 +93,10 @@
       {#key note.id}<NoteEditor {note} {saving} {onduplicates} onsubmit={saveContent} oncancel={() => { editingContent = false; }} />{/key}
     {/if}
     {#if note.skill_metadata}<section aria-label="Metadata skill"><h3>Metadata skill</h3><dl class="metadata">{#each Object.entries({ Pemicu: note.skill_metadata.trigger, Versi: note.skill_metadata.version, Kompatibilitas: (note.skill_metadata.compatibility || []).join(', '), 'Bukti pengujian': note.skill_metadata.test_evidence }) as [label, value]}<div><dt>{label}</dt><dd>{value || '—'}</dd></div>{/each}</dl><p class="hint">Pernyataan penulis, bukan pemeriksaan otomatis Memona.</p></section>{/if}
-    <article class="prose" aria-label="Isi memori">
+    {#if !contentFirst}<article class="prose" aria-label="Isi memori">
       <!-- Only Go goldmark's safe-mode Markdown response from our authenticated same-origin API. Never raw note.content. -->
       {#if detail.html.trim()}{@html detail.html}{:else}<p>Memori ini belum memiliki isi.</p>{/if}
-    </article>
+    </article>{/if}
     <section class="note-connections" aria-labelledby="connections-title">
       <div class="section-heading"><h3 id="connections-title">Hubungan catatan</h3>{#if !note.archived && !editing}<button type="button" class="secondary" disabled={saving || editingContent} onclick={editConnections}>Atur ringkasan & relasi</button>{/if}</div>
       {#if note.connections}

@@ -1,7 +1,7 @@
 import type { GraphData, GraphNode } from './types';
 
 export interface KnowledgeNode extends GraphNode { x: number; y: number; radius: number; degree: number }
-export const KNOWLEDGE_LIMIT = 100;
+export const KNOWLEDGE_LIMIT = 500;
 // Bounded deterministic force relaxation, no animation loop or background worker.
 // Project anchors affect placement only; they never introduce inferred edges.
 export function knowledgeLayout(data: GraphData) {
@@ -15,7 +15,10 @@ export function knowledgeLayout(data: GraphData) {
   });
   const index = new Map(nodes.map((n, i) => [n.id, i]));
   const edges = data.edges.filter(e => index.has(e.from) && index.has(e.to)).sort((a, b) => `${a.from}:${a.to}:${a.type}`.localeCompare(`${b.from}:${b.to}:${b.type}`));
-  for (let step = 0; step < 180; step++) {
+  // Preserve the legacy 180 passes through 100 nodes; larger graphs use at
+  // most about two million repulsion pairs (500 nodes × 16 passes).
+  const iterations = Math.max(16, Math.floor(180 * Math.min(1, 100 / Math.max(1, nodes.length)) ** 2));
+  for (let step = 0; step < iterations; step++) {
     const force = nodes.map(() => ({ x: 0, y: 0 }));
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {

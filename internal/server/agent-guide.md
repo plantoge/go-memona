@@ -54,6 +54,12 @@ Replay mengembalikan revisi hasil commit awal, bukan keadaan terbaru; tidak mena
 
 `revise_memory` memakai seluruh enam field pengganti di atas ditambah `id` dan `expected_revision` dari hasil terbaru. Ini bukan patch parsial. Project dan kind tidak dapat diganti. Konflik versi berarti baca ulang lalu gabungkan secara sadar; jangan retry menimpa tanpa review. Revisi lama tetap tersimpan. Mengedit skill aktif mengembalikannya menjadi draft untuk ditinjau ulang.
 
+## Waktu verifikasi dan perlu review
+
+Untuk catatan non-skill, field opsional `verified_at` berisi waktu UTC RFC3339 berakhiran Z yang **dinyatakan penulis**, bukan bukti server memverifikasi. Hanya boleh nonkosong ketika status verified dan source berisi bukti. `needs_review=true` menandai keraguan/review yang belum selesai, termasuk pada catatan verified. Ini peringatan, bukan arsip atau kontrol akses: search/read/context tetap menampilkan metadata dan context memberi warning. Jangan menyelesaikan pertentangan dengan memilih yang paling baru; baca sumber dan gunakan supersedes eksplisit setelah keputusan sadar.
+
+Pada revise, omission mempertahankan metadata; `verified_at:""` / `needs_review:false` membersihkan. Mengubah status dari verified membersihkan waktu lama; jangan mempertahankan tanggal verifikasi pada kesimpulan baru tanpa pemeriksaan. Catatan lama tidak diberi tanggal/label otomatis. Metadata ini bukan lifecycle publikasi skill.
+
 ## Handoff
 
 `save_handoff` membutuhkan enam field yang sama; kind dipaksa handoff oleh server. Isi ringkas: tujuan, sudah dikerjakan, file/commit, verifikasi yang benar-benar dijalankan, kendala, dan langkah berikutnya. Buat setelah tahap penting, bukan hanya saat sesi ditutup. Jangan menyebut test lulus jika belum dijalankan.

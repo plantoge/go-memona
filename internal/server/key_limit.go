@@ -8,8 +8,9 @@ import (
 	"golang.org/x/time/rate"
 )
 
-// keyLimiter holds process-local buckets indexed only by authenticated key.ID.
-// It never evicts active buckets to admit new keys: doing so would reset quotas.
+// keyLimiter holds process-local buckets indexed by stable key.ID or a
+// canonical direct peer (separate tables). It never holds bearer tokens and
+// never evicts active buckets to admit new identities: that would reset quotas.
 // Cleanup is lazy, under the same lock as admission; no goroutine is needed.
 type keyLimiter struct {
 	mu         sync.Mutex
@@ -29,7 +30,8 @@ type keyLimitEntry struct {
 }
 
 // newKeyLimiter fails closed for nonpositive settings. Callers must supply the
-// stable authenticated key ID, never a bearer token or a forwarded IP address.
+// stable authenticated key ID or canonical direct peer, never a bearer token
+// or a forwarded IP address. Peer and key budgets must use separate instances.
 func newKeyLimiter(maxEntries int, perSec rate.Limit, burst int, idle time.Duration) *keyLimiter {
 	return &keyLimiter{
 		maxEntries: maxEntries,
@@ -38,6 +40,13 @@ func newKeyLimiter(maxEntries int, perSec rate.Limit, burst int, idle time.Durat
 		idle:       idle,
 		entries:    make(map[string]*list.Element),
 	}
+}
+
+// size returns only a bounded aggregate; bucket identities never leave the table.
+func (l *keyLimiter) size() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.entries)
 }
 
 // Allow consumes one token, if available. Empty IDs and admission to a full map

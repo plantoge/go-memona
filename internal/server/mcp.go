@@ -53,6 +53,8 @@ type summary struct {
 	Excerpt            string          `json:"excerpt"`
 	IsProjectSummary   bool            `json:"is_project_summary,omitempty"`
 	IsTesting          bool            `json:"is_testing,omitempty"`
+	VerifiedAt         string          `json:"verified_at,omitempty"`
+	NeedsReview        bool            `json:"needs_review,omitempty"`
 	SupersededBy       []noteReference `json:"superseded_by"`
 	RelationsTruncated bool            `json:"relations_truncated"`
 }
@@ -131,14 +133,14 @@ func (a *App) mcpServerContext(requestCtx context.Context, k access.Key) *mcp.Se
 			if err != nil {
 				return nil, results{}, publicReadError(err)
 			}
-			out.Items = append(out.Items, summary{ID: n.ID, Project: n.Project, Kind: n.Kind, Title: n.Title, Status: n.Status, Revision: n.Revision, UpdatedAt: n.UpdatedAt, Excerpt: excerpt(n.Content, 300), IsProjectSummary: n.IsProjectSummary, IsTesting: n.IsTesting, SupersededBy: links.SupersededBy, RelationsTruncated: links.Truncated})
+			out.Items = append(out.Items, summary{ID: n.ID, Project: n.Project, Kind: n.Kind, Title: n.Title, Status: n.Status, Revision: n.Revision, UpdatedAt: n.UpdatedAt, Excerpt: excerpt(n.Content, 300), IsProjectSummary: n.IsProjectSummary, IsTesting: n.IsTesting, VerifiedAt: n.VerifiedAt, NeedsReview: n.NeedsReview, SupersededBy: links.SupersededBy, RelationsTruncated: links.Truncated})
 		}
 		a.audit(k.Actor(), "memory.search", in.Project)
 		return nil, out, nil
 	})
 	addDuplicateTool(requestCtx, s, a, k)
 	toolContext(requestCtx, s, "get_context", "Read global and requested project context with a bounded output. Specify a known project slug. Does not load all projects or all skills.", true, func(ctx context.Context, r *mcp.CallToolRequest, in queryInput) (*mcp.CallToolResult, contextResult, error) {
-		out := contextResult{Notes: []noteView{}, Guidance: "Project summaries are prioritized, then lexical task relevance (title > content > source), durable notes and recency. Mixed context includes at most 2 handoffs; use kind=handoff to retrieve more explicitly. Category/output omissions set truncated=true. Explicit is_testing notes are excluded by default; include_testing=true opts in. Search/read can inspect them. No stemming, semantic inference or automatic classification of old notes. Superseded notes are omitted from context; search/read explicitly for history. Connections are bounded one-hop references, not automatically loaded. Context may be incomplete; verify current state."}
+		out := contextResult{Notes: []noteView{}, Guidance: "Project summaries are prioritized, then lexical task relevance (title > content > source), durable notes and recency. Mixed context includes at most 2 handoffs; use kind=handoff to retrieve more explicitly. Category/output omissions set truncated=true. Explicit is_testing notes are excluded by default; include_testing=true opts in. Search/read can inspect them. No stemming, semantic inference or automatic classification of old notes. Superseded notes are omitted from context; search/read explicitly for history. Connections are bounded one-hop references, not automatically loaded. needs_review is an explicit unresolved-review warning, not automatically resolved by verified status. verified_at is author-declared, not server verification. Conflicting statements are not resolved by recency; inspect sources and explicit supersedes. Context may be incomplete; verify current state."}
 		if in.Project == "" {
 			in.Project = "global"
 		}
@@ -317,6 +319,8 @@ func (a *App) mcpServerContext(requestCtx context.Context, k access.Key) *mcp.Se
 			n.IsProjectSummary = false
 			n.IsTesting = false
 			n.SkillMetadata = nil
+			n.VerifiedAt = ""
+			n.NeedsReview = false
 			n.RelatedTo = nil
 			n.Supersedes = nil
 		}

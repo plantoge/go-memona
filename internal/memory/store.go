@@ -59,6 +59,8 @@ type Note struct {
 	RelatedTo        []string       `json:"related_to,omitempty"`
 	Supersedes       []string       `json:"supersedes,omitempty"`
 	SkillMetadata    *SkillMetadata `json:"skill_metadata,omitempty"`
+	VerifiedAt       string         `json:"verified_at,omitempty"`
+	NeedsReview      bool           `json:"needs_review,omitempty"`
 	operation        *operationRecord
 }
 
@@ -74,6 +76,8 @@ type Input struct {
 	RelatedTo        []string       `json:"related_to,omitempty" jsonschema:"Optional related note IDs in the SAME project, max 20. Omit on revise to preserve; empty array clears. Requires read and write when supplied."`
 	Supersedes       []string       `json:"supersedes,omitempty" jsonschema:"Optional IDs this note explicitly replaces, SAME project, max 20. Omit on revise to preserve; empty array clears. Requires read and write when supplied. No self links or cycles."`
 	SkillMetadata    *SkillMetadata `json:"skill_metadata,omitempty" jsonschema:"Optional structured metadata for skills only. Omit on revise to preserve; empty object clears. Descriptive text only, not executable or a publish approval."`
+	VerifiedAt       *string        `json:"verified_at,omitempty" jsonschema:"Optional self-declared verification time for non-skills, canonical UTC RFC3339Nano (Z). Requires verified status and source evidence. Omit on revise to preserve while verified; empty string clears. Not a server verification."`
+	NeedsReview      *bool          `json:"needs_review,omitempty" jsonschema:"Optional explicit review flag for non-skills. Omit on revise to preserve; false clears. Does not change status, permissions, or supersedes relations."`
 }
 
 // Store holds an exclusive process-wide writer lease until Close. Operations on
@@ -247,8 +251,21 @@ func validate(input Input, author string, allowActive bool) error {
 
 func noteInput(n Note) Input {
 	summary, testing := n.IsProjectSummary, n.IsTesting
+	var verifiedAt *string
+	var needsReview *bool
+	// Skills cannot receive even explicit clears. Preserve nil for valid skills,
+	// but expose illegal stored values so history validation rejects them.
+	if n.Kind != "skill" || n.VerifiedAt != "" {
+		value := n.VerifiedAt
+		verifiedAt = &value
+	}
+	if n.Kind != "skill" || n.NeedsReview {
+		value := n.NeedsReview
+		needsReview = &value
+	}
 	return Input{Project: n.Project, Kind: n.Kind, Title: n.Title, Content: n.Content, Status: n.Status, Source: n.Source,
-		IsProjectSummary: &summary, IsTesting: &testing, RelatedTo: n.RelatedTo, Supersedes: n.Supersedes, SkillMetadata: cloneSkillMetadata(n.SkillMetadata)}
+		IsProjectSummary: &summary, IsTesting: &testing, RelatedTo: n.RelatedTo, Supersedes: n.Supersedes, SkillMetadata: cloneSkillMetadata(n.SkillMetadata),
+		VerifiedAt: verifiedAt, NeedsReview: needsReview}
 }
 
 func sameInput(a, b Input) bool { return reflect.DeepEqual(a, b) }
