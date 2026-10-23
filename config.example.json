@@ -1,0 +1,6 @@
+{
+  "listen": "127.0.0.1:8765",
+  "data_dir": "./data",
+  "public_url": "http://127.0.0.1:8765",
+  "secure_cookies": false
+}

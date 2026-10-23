@@ -1,0 +1,44 @@
+# EXAMPLE ONLY: do not install unchanged. All REPLACE_* values need review.
+# No account, directory, configuration or secret is created by this template.
+[Unit]
+Description=Memona (reviewed example)
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=REPLACE_WITH_NONROOT_USER
+Group=REPLACE_WITH_NONROOT_GROUP
+WorkingDirectory=/ABSOLUTE/REPLACE_WITH_APPLICATION_DIRECTORY
+ExecStart=/ABSOLUTE/REPLACE_WITH_APPLICATION_DIRECTORY/bin/memona serve -config /ABSOLUTE/REPLACE_WITH_PRIVATE_CONFIG_DIRECTORY/config.json
+# Bootstrap ONLY, if an existing private file has been approved separately.
+# Keep commented for normal operation; do not add a leading '-' (missing must fail).
+# EnvironmentFile=/ABSOLUTE/REPLACE_WITH_PRIVATE_BOOTSTRAP_DIRECTORY/bootstrap.env
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Must exactly match the absolute data_dir in the private JSON configuration.
+# Directory must already exist and be writable by the nonroot service identity.
+ReadWritePaths=/ABSOLUTE/REPLACE_WITH_DATA_DIRECTORY
+KillSignal=SIGTERM
+KillMode=control-group
+# Application HTTP shutdown budget is 10 seconds; allow time to close storage.
+TimeoutStopSec=30s
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

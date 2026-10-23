@@ -1,0 +1,14 @@
+/.cache/
+/bin/
+/data/
+/backups/
+/restore-*/
+/config.json
+/.env
+/.env.*
+!/.env.example
+*.log
+/frontend/node_modules/
+/frontend/.vite/
+# Hasil build frontend disertakan sebagai input embed; bukan data runtime.
+# Jangan abaikan internal/webui/dist: Go-only build memerlukan aset ini.

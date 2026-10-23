@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="color-scheme" content="light">
+  <title>Memona — Ruang memori</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Lewati ke konten</a>
+  <div id="announcements" class="announcements">
+    <p id="status" role="status" aria-live="polite">Memeriksa sesi…</p>
+    <p id="error" role="alert" hidden></p>
+  </div>
+  <section id="login" class="login-wrap" hidden aria-labelledby="login-title">
+    <div class="login-card">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">m</span> memona<span class="brand-dot" aria-hidden="true">.</span></div>
+      <p class="eyebrow">RUANG MEMORI BERSAMA</p>
+      <h1 id="login-title">Pengetahuan yang<br>tetap terhubung.</h1>
+      <p class="muted">Masuk sebagai administrator untuk meninjau memori, menerbitkan skill, dan mengelola akses.</p>
+      <form id="login-form">
+        <label for="password">Kata sandi administrator</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button id="login-submit" type="submit" class="primary full">Masuk ke ruang memori</button>
+      </form>
+      <p class="fine-print">Sesi menggunakan cookie aman. Kata sandi tidak disimpan oleh dashboard.</p>
+    </div>
+  </section>
+  <div id="dashboard" class="shell" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">m</span> memona<span class="brand-dot" aria-hidden="true">.</span></div>
+      <p class="nav-label">RUANG KERJA</p>
+      <nav aria-label="Navigasi utama">
+        <button type="button" data-view="notes" aria-current="page"><span aria-hidden="true">01</span> Semua memori</button>
+        <button type="button" data-view="skills"><span aria-hidden="true">02</span> Pustaka skill</button>
+        <button type="button" data-view="keys"><span aria-hidden="true">03</span> Kunci API</button>
+        <button type="button" data-view="activity"><span aria-hidden="true">04</span> Aktivitas</button>
+      </nav>
+      <div class="sidebar-bottom"><span class="session-badge">Sesi administrator</span><p>Memori terpusat.<br>Konteks tetap terjaga.</p><button id="logout" type="button" class="secondary">Keluar</button></div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <header class="page-header"><div><p class="eyebrow">MEMONA / DASHBOARD</p><h1 id="page-title">Semua memori</h1><p id="page-description" class="muted">Temukan konteks, keputusan, dan pengetahuan lintas proyek.</p></div><button id="refresh" type="button" class="secondary">Muat ulang data</button></header>
+      <section id="notes-view" aria-label="Daftar memori">
+        <div class="stats">
+          <article class="stat"><p>Hasil pencarian</p><strong id="note-count">—</strong><span>Memori sesuai filter</span></article>
+          <article class="stat"><p>Skill dalam hasil</p><strong id="skill-count">—</strong><span>Pengetahuan yang dapat digunakan ulang</span></article>
+          <article class="stat"><p>Proyek tersedia</p><strong id="project-count">—</strong><span>Ruang konteks yang terhubung</span></article>
+        </div>
+        <form id="filters" class="filters" role="search">
+          <div class="search-field"><label for="query">Cari memori</label><input id="query" type="search" placeholder="Cari judul atau isi memori…" autocomplete="off"></div>
+          <div><label for="project-filter">Proyek</label><select id="project-filter"><option value="">Semua proyek</option></select></div>
+          <div><label for="kind-filter">Jenis</label><select id="kind-filter"><option value="">Semua jenis</option><option value="memory">Memory</option><option value="skill">Skill</option></select></div>
+          <button type="submit" class="primary">Cari</button>
+        </form>
+        <div class="section-heading"><h2 id="list-heading">Memori tersimpan</h2><span class="muted">Pilih memori untuk melihat detail</span></div>
+        <div id="notes-list" class="notes-grid" aria-busy="false"></div>
+      </section>
+      <section id="keys-view" hidden aria-labelledby="keys-heading">
+        <div class="section-heading"><h2 id="keys-heading">Akses untuk integrasi</h2><span class="muted">Batasi izin dan proyek sesuai kebutuhan</span></div>
+        <div id="secret-panel" class="secret-panel" hidden>
+          <h3>Kunci baru berhasil dibuat</h3><p>Token ini hanya ditampilkan sekali. Salin sekarang dan simpan di tempat aman. Jangan bagikan di percakapan atau kode sumber.</p>
+          <label for="new-token">Token rahasia</label><textarea id="new-token" readonly rows="3" spellcheck="false" autocomplete="off"></textarea>
+          <div class="actions"><button id="copy-token" type="button" class="primary">Salin token</button><button id="dismiss-token" type="button" class="secondary">Saya sudah menyimpan, tutup</button></div>
+        </div>
+        <form id="key-form" class="panel key-form">
+          <h3>Buat kunci API</h3>
+          <div class="form-grid"><div><label for="key-name">Nama kunci</label><input id="key-name" name="name" required maxlength="100" placeholder="Contoh: Asisten proyek" autocomplete="off"></div><div><label for="key-expiry">Tanggal kedaluwarsa (opsional)</label><input id="key-expiry" type="date" aria-describedby="expiry-hint"><p id="expiry-hint" class="hint">Berlaku sampai akhir tanggal ini, sesuai zona waktu perangkat.</p></div></div>
+          <fieldset><legend>Izin akses</legend><label class="check-label"><input type="checkbox" name="permission" value="read" checked> Baca (read)</label><label class="check-label"><input type="checkbox" name="permission" value="write" checked> Tulis (write)</label><label class="check-label"><input type="checkbox" name="permission" value="archive"> Arsipkan (archive, tanpa hapus permanen)</label></fieldset>
+          <label for="key-projects">Proyek yang diizinkan</label><input id="key-projects" required placeholder="proyek-a, proyek-b" aria-describedby="projects-hint" autocomplete="off"><p id="projects-hint" class="hint">Slug huruf kecil, angka, dan tanda hubung; pisahkan dengan koma. Gunakan * untuk semua proyek.</p>
+          <button id="create-key" type="submit" class="primary">Buat kunci</button>
+        </form>
+        <h2 class="list-title">Daftar kunci</h2><div id="keys-list" class="stack" aria-busy="false"></div>
+      </section>
+      <section id="activity-view" hidden aria-labelledby="activity-heading"><h2 id="activity-heading">Jejak aktivitas</h2><p class="muted">Tinjau tindakan dan perubahan yang tercatat di server.</p><div id="activity-list" class="stack" aria-busy="false"></div></section>
+      <footer>Memona <span aria-hidden="true">/</span> Satu tempat untuk konteks yang berkelanjutan.</footer>
+    </main>
+  </div>
+  <dialog id="detail-dialog" aria-labelledby="detail-title">
+    <div class="dialog-top"><span class="eyebrow">DETAIL MEMORI</span><button id="close-detail" type="button" class="secondary">Tutup</button></div>
+    <h2 id="detail-title">Detail memori</h2><p id="detail-status" role="status"></p><p id="detail-error" role="alert" hidden></p>
+    <div id="detail-body" hidden><dl id="detail-meta" class="metadata"></dl><div class="actions"><button id="publish-note" type="button" class="primary">Terbitkan sebagai skill</button><button id="archive-note" type="button" class="danger">Arsipkan memori</button><button id="restore-note" type="button" hidden>Pulihkan dari arsip</button></div><article id="note-content" class="prose" aria-label="Isi memori"></article><details><summary>Riwayat revisi</summary><div id="note-history" class="stack"></div></details></div>
+  </dialog>
+  <noscript><p class="noscript">Dashboard ini memerlukan JavaScript. Aktifkan JavaScript untuk masuk dan mengelola memori.</p></noscript>
+</body>
+</html>

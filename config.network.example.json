@@ -1,0 +1,6 @@
+{
+  "listen": "0.0.0.0:8765",
+  "data_dir": "./data",
+  "public_url": "https://memona.example.com",
+  "secure_cookies": true
+}
