@@ -10,10 +10,10 @@ export GOMODCACHE := $(CURDIR)/.cache/mod
 export GOPATH := $(CURDIR)/.cache/go
 export GOTMPDIR := $(CURDIR)/.cache/tmp
 
-.PHONY: help cache build build-go frontend-install frontend-build frontend-check frontend-test frontend-dev serve test race vet check recovery-test recovery-smoke
+.PHONY: help cache build build-go frontend-install frontend-build frontend-check frontend-test frontend-dev serve start status test race vet check recovery-test recovery-smoke
 
 help:
-	@echo 'make build | build-go | frontend-dev | serve | test | race | vet | check'
+	@echo 'make start | status | build | build-go | frontend-dev | serve | test | race | vet | check'
 	@echo 'Go 1.26.8; build UI memerlukan Node 22.18+ (disarankan Node 24 LTS) dan npm'
 	@echo 'serve menggunakan CONFIG=config.json; build-go memakai aset dist yang tersedia'
 	@echo 'recovery-test | recovery-smoke (binary harus sudah dibuild; fixture sintetis dipertahankan)'
@@ -45,6 +45,13 @@ build-go: cache
 
 serve: cache
 	$(GO) run ./cmd/memona serve -config "$(CONFIG)"
+
+# Rutinitas lokal: tidak build, bootstrap, mengubah config, atau mengelola service.
+start:
+	python3 -B scripts/local.py start --config "$(CONFIG)"
+
+status:
+	python3 -B scripts/local.py status --config "$(CONFIG)"
 
 test: cache
 	$(GO) test ./...

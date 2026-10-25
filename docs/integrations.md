@@ -38,7 +38,7 @@ Keenam field inti `memory.Input` wajib hadir pada skema meskipun `source` boleh 
 
 Field **opsional**: `is_project_summary`, `related_to`, `supersedes`. Saat revise, field yang tidak dikirim dipertahankan; `false`/`[]` mengosongkannya. Penetapan metadata memerlukan read+write. Ringkasan hanya knowledge, maks. 8000 byte, satu nonarsip per proyek. Target relasi harus nyata dalam proyek yang sama, unik, maks. 20 per jenis; diri sendiri/siklus supersedes ditolak. Backlink turunan hanya dari sumber nonarsip dan dibatasi. Search menyertakan `superseded_by`; read/skill/context memakai `connections`. Lihat [kontrak relasi](memory-relations.md), termasuk batas rollback format.
 
-**Acceptance pengguna 23 Oktober 2026:** OpenCode dilaporkan sudah dicoba. Hasil ini tidak membuktikan versi Hermes/harness lain, browser seluruh fitur atau aktivasi binary increment terbaru.
+**Laporan pengguna 25 Oktober 2026:** pengguna menyatakan poin uji browser dan alur OpenCode–dashboard–Hermes yang disarankan sudah dicoba dan berhasil. Ini adalah acceptance yang dilaporkan pengguna, bukan pengujian yang dijalankan agen. Versi/build, URL nonsecret, rincian skenario per langkah, hasil negatif, dan pengukuran FPS graph belum dicatat; jangan menyimpulkan seluruh matriks di bawah atau aktivasi binary terbaru telah terverifikasi.
 
 Metadata review opsional non-skill: `verified_at` waktu UTC RFC3339Nano kanonis yang dinyatakan penulis (status verified + source evidence), `needs_review` flag keraguan eksplisit. Omission mempertahankan; string kosong/false membersihkan; keluar dari verified menghapus waktu warisan. Search/read/context menampilkannya, context memberi warning tanpa menyelesaikan konflik berdasarkan recency. [Kontrak lengkap](review-metadata.md).
 

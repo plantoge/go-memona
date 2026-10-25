@@ -1,5 +1,15 @@
 # Laporan verifikasi pengembangan
 
+## Startup lokal sederhana — 25 Oktober 2026
+
+`make start` menjalankan binary yang sudah dibuild di foreground, tanpa `go run`/npm/build, tanpa membuat data atau config baru, dan menolak writer lain berdasarkan lock existing. `make status` hanya membaca lock dan melakukan probe `/healthz` ke loopback bila listener lokal/wildcard, tidak memanggil URL publik; kedua bukti diperlukan untuk klaim aktif pada data yang sama. Pada bind IP jaringan spesifik status tidak mem-probe jaringan dan hasil bisa belum terkonfirmasi. Bootstrap pertama, pengelolaan service dan recovery admin tetap terpisah.
+
+Verifikasi aktual: `python3 -B -m unittest discover -s scripts -p 'test_*.py'` **76 lulus**, termasuk 4 test baru untuk preflight/data absen, lock sibuk, kombinasi lock/health dan Host pada wildcard loopback. `make status` pada konfigurasi proyek saat ini memberi hasil *tidak terkonfirmasi aktif* dan exit nonzero sebagaimana dirancang; tidak ada start, stop atau perubahan data. `git diff --check` lulus. Tidak ada test browser atau test Go yang diulang karena source Go/UI tidak berubah. Runtime start nyata belum dijalankan.
+
+## Laporan acceptance pengguna — 25 Oktober 2026
+
+Pengguna melaporkan bahwa poin uji browser dan alur OpenCode–dashboard–Hermes yang disarankan telah dicoba dan berhasil. Tidak ada versi/build/URL nonsecret, catatan pass/fail per langkah, hasil uji negatif, atau angka FPS yang diberikan. Ini bukti laporan pengguna, **bukan** acceptance yang dijalankan agen atau verifikasi bahwa semua kasus dalam `docs/integrations.md` telah lulus. Langkah backup konsisten dan latihan restore data aktif belum dilaksanakan; operasi tersebut memerlukan persetujuan spesifik serta downtime terjadwal. Catatan pending di bawah adalah riwayat pengujian agen, bukan penyangkalan atas laporan pengguna ini.
+
 ## Optimasi graph adaptif — 23 Oktober 2026
 
 User menyetujui optimasi tanpa mengganti library. File baru `frontend/src/lib/graph-quality.ts` memusatkan profil kualitas, pemilihan label dan scheduler trailing timer+RAF. Renderer/wrapper/toolbar menggunakannya: mode Ringan saat >100node ATAU >300edge (DPR1, nodeResolution6, cooldown60tick/1800ms), normal DPR<=1.5/resolution12/cooldown120tick/3000ms. Seluruh500 node tetap diterima. LinkWidth0 memakai Three.Line, tanpa kurva kecuali self-loop, panah hanya relasi hover/selected. Default label hanya active; opt-in24/48 node terdekat, proyeksi/pembaruan dibatasi80/50ms, tidak memproyeksikan seluruh500 label per tick. Tidak ada physics warmup tambahan pada reduced-motion; seed layout deterministik tetap tersedia. Tidak mematikan render/picking ketika physics dingin: orbit/zoom/klik tetap tersedia; loop library masih aktif kecuali manual pause/visibility/dialog.

@@ -4,7 +4,7 @@ Memori proyek bersama untuk agen AI dan manusia: catatan Markdown berversi, dash
 
 ## Status dan batas klaim
 
-Versi awal telah dibuild dan diuji otomatis: test Go, race detector, go vet, serta smoke test binary lokal lulus. Rincian bukti dan batasnya ada di [laporan verifikasi](docs/verification.md). Tool backup/restore offline juga diuji dengan fixture sintetis; pemulihan data pengguna/cutover operasional tetap pending. Dashboard belum diuji secara visual pada browser nyata; integrasi sesi OpenCode/Hermes serta akses Cloudflare masih pending. Tidak ada klaim uji lima langkah harness nyata yang sudah lulus.
+Versi awal telah dibuild dan diuji otomatis: test Go, race detector, go vet, serta smoke test binary lokal lulus. Rincian bukti dan batasnya ada di [laporan verifikasi](docs/verification.md). Tool backup/restore offline juga diuji dengan fixture sintetis; pemulihan data pengguna/cutover operasional tetap pending. Pengguna melaporkan uji browser dan alur OpenCode–dashboard–Hermes berhasil, tetapi versi/build, hasil per skenario, uji negatif dan FPS belum dicatat; ini bukan audit keamanan atau acceptance deployment publik. Akses HTTPS/reverse proxy dan instalasi service belum diuji pada home server.
 
 Tidak ada instalasi global, service, tunnel, DNS, atau konfigurasi harness pengguna yang diterapkan. Tidak ada data pribadi lama yang diimpor.
 
@@ -29,6 +29,54 @@ Dashboard memakai **Svelte 5 + TypeScript + Vite**, dengan source terpisah di `f
 Backlog berprioritas, checklist, dependensi dan kriteria selesai tersedia di [task pengembangan](docs/tasks.md). Daftar tersebut adalah rencana, bukan fitur yang sudah diimplementasikan atau izin deployment.
 
 ## Mulai lokal
+
+### Instalasi baru di home server Linux (source → binary)
+
+Ini **instalasi baru**, bukan migrasi dari server lama. Siapkan Git, Bash, Make, Python 3, Go 1.26.8, Node 22.18+ atau 24+ dan npm pada mesin build; gunakan akun Linux biasa yang akan memiliki direktori proyek dan data, **bukan root**. Pastikan filesystem lokal mendukung `flock`, `fsync`, dan `renameat2(RENAME_NOREPLACE)`; disk dan akses untuk mengunduh dependency harus cukup. Repo tidak menyediakan instalasi otomatis Go/Node, seeder admin, migration CLI, atau service. Node/npm hanya dibutuhkan ketika membangun UI; binary akhir sudah berisi aset dashboard.
+
+1. Ambil source dari **URL repository dan branch/commit yang Anda percayai** (ganti placeholder, jangan menyalin URL contoh). Jika perubahan lokal di mesin pengembang belum di-commit dan di-push, clone tidak akan memuatnya:
+
+   ```bash
+   git clone <URL_REPOSITORY_ANDA> memona
+   cd memona
+   git log -1 --oneline
+   make build
+   ```
+
+   `make build` menjalankan `npm ci --ignore-scripts`, pemeriksaan/build Svelte, lalu build Go ke `bin/memona`; build dapat mengunduh dependency. Untuk pemeriksaan tambahan jalankan `make test`, `make vet`, dan `make race`. Bila build gagal, jangan memakai binary lama sebagai bukti build baru berhasil. Semua perintah berikut dijalankan dari root proyek: `data_dir: ./data` relatif ke **working directory**, bukan lokasi file JSON.
+
+2. Buat config awal tanpa menimpa config yang sudah ada. Pilih **salah satu** akses di bawah sebelum menjalankan server:
+
+   ```bash
+   umask 077
+   cp -n config.example.json config.json
+   ```
+
+   - **Lokal/SSH tunnel:** biarkan `config.example.json` apa adanya (`127.0.0.1:8765`, URL `http://127.0.0.1:8765`, cookie non-Secure). Hanya bisa diakses langsung dari mesin server; untuk akses jarak jauh gunakan tunnel/proxy yang dikonfigurasi terpisah.
+   - **Akses HTTPS home server:** bila reverse proxy TLS tepercaya berjalan **di mesin yang sama**, pertahankan `listen: "127.0.0.1:8765"` dan `data_dir: "./data"`, tetapi edit `config.json` menjadi `public_url: "https://NAMA_HOST_ASLI"`, `secure_cookies: true`, dan `allow_private_http: false` (atau hapus field terakhir). Atur reverse proxy secara terpisah agar meneruskan Host asli ke backend loopback, sertifikat valid, dan membatasi akses port backend. Ganti nama host dengan milik Anda; jangan memakai `NAMA_HOST_ASLI` secara literal. Memona sendiri hanya HTTP dan tidak mengelola sertifikat, DNS, firewall, atau proxy. Baca [akses jaringan](docs/network.md) dan [keamanan](docs/security.md) sebelum membuka akses publik.
+   - **HTTP privat LAN/Tailscale khusus uji:** lihat [contoh dan risikonya](docs/network.md#testing-langsung-lantailscale). Jangan gunakan `allow_private_http` untuk internet publik, dan jangan port-forward backend HTTP.
+
+   Jangan gunakan `0.0.0.0` tanpa kebutuhan dan pembatasan jaringan; binding wildcard dapat dijangkau interface lain. Config tidak otomatis diisi dari `.env`.
+
+3. **Bootstrap admin sekali** di terminal interaktif milik akun pemilik data. Source Go membuat tabel SQLite, akun admin tunggal dan data Markdown saat startup; **tidak ada perintah seeder/migrate**. Password baru minimal 16 byte (gunakan minimal 16 karakter ASCII acak), maksimum 1024 byte, tanpa default. Input tidak tampak dan tidak dikirim sebagai argumen proses:
+
+   ```bash
+   read -rs -p 'Password admin baru: ' MEMONA_ADMIN_PASSWORD
+   printf '\n'
+   export MEMONA_ADMIN_PASSWORD
+   ./bin/memona serve -config config.json
+   unset MEMONA_ADMIN_PASSWORD
+   ```
+
+   Jangan aktifkan tracing shell (`set -x`); `unset` berjalan setelah server berhenti/command gagal. Jangan masukkan password ke chat, config, shell history, atau repository. Penggunaan environment hanya untuk bootstrap pertama; pada restart berikutnya admin yang sudah ada tidak ditimpa, dan password bootstrap tidak diperlukan. Jika database baru gagal bootstrap, **jangan hapus database/lock untuk mencoba reset**. Server berjalan di foreground; hentikan normal dengan `Ctrl+C`.
+
+4. **Periksa akses.** Pada konfigurasi lokal, buka `http://127.0.0.1:8765` dari mesin server (atau melalui jalur yang sudah disetujui). Pada konfigurasi HTTPS, gunakan tepat origin `public_url`. Login sebagai administrator dengan password bootstrap; buat API key terpisah untuk OpenCode dan Hermes melalui menu **MCP Server**, batasi proyek/izin dan simpan token sekali ke secret environment klien. Jangan memakai password admin sebagai bearer `/mcp`. `/healthz` adalah liveness minimal, **bukan** pemeriksaan login/backup/penyimpanan. Uji juga login gagal, logout, scope key, dan akses browser sebelum membuka layanan ke pihak lain.
+
+5. **Run rutin setelah bootstrap:** dari root proyek, `make status` lalu `make start` (atau `./bin/memona serve -config config.json`). Launcher `make start` tidak tersedia pada clone sampai perubahan lokal ini di-commit dan di-push; binary langsung tetap bekerja. `make start` membutuhkan data/lock yang sudah ada dan tidak membuat akun; tidak menjalankan build. Server foreground tidak otomatis hidup setelah reboot: jika perlu startup otomatis, rancang service non-root, secret/working directory dan graceful stop secara terpisah. **Tidak ada unit service terpasang oleh repo.** Jangan jalankan dua proses pada `data_dir` yang sama atau hapus `.writer.lock` untuk memaksa startup.
+
+6. **Sebelum penggunaan rutin/upgrade:** lindungi direktori data, jadwalkan backup konsisten setelah stop normal, verifikasi digest dan latihan restore **ke direktori baru** sesuai [prosedur operasi](docs/operations.md). `git clone`/`git pull` tidak membawa atau memigrasikan `data/`, admin, key, maupun audit; `config.json`, `data/`, `bin/` juga tidak masuk Git. Untuk pindah mesin gunakan prosedur backup/verify/restore dengan pasangan binary/data kompatibel, jangan menyalin SQLite yang sedang ditulis atau menjalankan restore di atas data aktif. Cutover dan aktivasi HTTPS/service pada server nyata tetap perlu rencana uji dan rollback.
+
+**Pemakaian harian setelah bootstrap:** dari root proyek, jalankan `make status` untuk memeriksa lock writer dan `/healthz` lokal, lalu `make start` untuk menjalankan binary yang sudah dibuild di foreground. Hentikan normal dengan Ctrl+C. `make start` tidak membangun ulang UI/Go, tidak membuat akun/data/config, dan menolak jika lock sedang dipakai; gunakan `make build` hanya bila source berubah. Pilihan lain tanpa Make: `python3 -B scripts/local.py status` / `python3 -B scripts/local.py start`. Berikan `CONFIG=path/yang/disetujui.json` pada Make bila bukan config default. Status tanpa dua bukti bukan readiness; lihat [operasi](docs/operations.md). Launcher bukan service/background manager dan tidak perlu Node saat runtime.
 
 Prasyarat: Linux/filesystem lokal yang mendukung `flock`, `fsync`, dan `renameat2(RENAME_NOREPLACE)`, Bash, Make, serta Go **1.26.8**. `go.mod` menyatakan baseline bahasa Go 1.26.0; toolchain 1.26.8 adalah target lingkungan, bukan klaim pin patch di direktif `go`. Dependensi dipatok: official MCP Go SDK **v1.8.0**, goldmark **v1.8.6**, modernc SQLite **v1.61.0**, dengan checksum di `go.sum`.
 
