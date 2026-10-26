@@ -20,6 +20,8 @@ Ganti `URL_REPO_ANDA` dengan alamat repo Anda. **`make run` adalah satu perintah
 
 `make run` meminta pilihan **lokal**, **LAN/Tailscale privat**, atau **HTTPS lewat reverse proxy**, membuat `config.json` **hanya jika belum ada**, lalu meminta password admin dua kali tanpa menampilkannya (minimal 10 karakter ASCII; gunakan password acak yang lebih panjang bila memungkinkan). Go membuat akun admin tunggal dan tabel SQLite saat startup pertama; tidak ada seeder, migrasi manual, atau password bawaan. Hentikan normal dengan **Ctrl+C**.
 
+Jika setup pertama gagal setelah membuat database tanpa admin, perbaiki penyebabnya lalu ulangi `make setup`: perintah ini membangun ulang Go sebelum meminta password, memeriksa bahwa tabel admin kosong, dan tidak mereset akun yang sudah ada. `make build` untuk memperbarui UI sekaligus Go.
+
 Buka alamat yang ditampilkan di `config.json`: lokal **http://127.0.0.1:8765**; LAN/Tailscale memakai IP privat yang dimasukkan. HTTP privat hanya untuk jaringan tepercaya—**jangan port-forward ke internet**. Untuk domain HTTPS, Memona tetap di localhost; siapkan reverse proxy TLS (misalnya Nginx atau Caddy) dan sertifikat secara terpisah. Proxy **tidak wajib** untuk akses lokal/privat. Lihat [akses jaringan](docs/network.md).
 
 ## 4. Jalankan lagi tanpa build

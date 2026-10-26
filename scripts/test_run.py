@@ -28,6 +28,17 @@ class RunTest(unittest.TestCase):
                     runner.run()
                 build.assert_not_called()
 
+    def test_interrupted_bootstrap_builds_and_prompts_instead_of_start(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "data").mkdir()
+            (root / "config.json").write_text(json.dumps({"data_dir": "./data"}))
+            with patch.object(runner.local, "ROOT", root), patch.object(runner.local, "writer_busy", return_value=False), patch.object(runner.setup, "interrupted_bootstrap", return_value=True), patch.object(runner.sys.stdin, "isatty", return_value=True), patch.object(runner.subprocess, "run") as build, patch.object(runner.setup, "setup") as bootstrap, patch.object(runner.local, "main") as start:
+                self.assertEqual(runner.run(), 0)
+                build.assert_called_once()
+                bootstrap.assert_called_once_with("config.json")
+                start.assert_not_called()
+
     def test_existing_data_uses_existing_account_and_config(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

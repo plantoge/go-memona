@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -43,6 +44,55 @@ class SetupTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Data sudah ada"):
                     setup.setup()
                 execve.assert_not_called()
+
+    def test_failed_bootstrap_with_empty_admin_can_retry_without_deleting_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "bin").mkdir()
+            binary = root / "bin" / "memona"
+            binary.write_bytes(b"fixture")
+            binary.chmod(0o700)
+            data = root / "data"
+            data.mkdir(mode=0o700)
+            database = data / "memona.db"
+            with sqlite3.connect(database) as connection:
+                connection.execute("CREATE TABLE admin (id INTEGER PRIMARY KEY, salt TEXT, hash TEXT)")
+            database.chmod(0o600)
+            (data / ".writer.lock").write_bytes(b"")
+            config = root / "config.json"
+            original = '{"data_dir":"./data","listen":"192.168.1.6:8765","public_url":"http://192.168.1.6:8765","allow_private_http":true}'
+            config.write_text(original)
+            with patch.object(setup.local, "ROOT", root), patch.object(setup.sys.stdin, "isatty", return_value=True), patch.object(setup.getpass, "getpass", side_effect=["1234567890", "1234567890"]), patch.object(setup.os, "chdir"), patch.object(setup.os, "execve") as execve:
+                setup.setup()
+                execve.assert_called_once()
+                self.assertEqual(execve.call_args.args[2]["MEMONA_ADMIN_PASSWORD"], "1234567890")
+            self.assertEqual(config.read_text(), original)
+            self.assertTrue(database.exists())
+
+    def test_existing_admin_or_unknown_database_blocks_retry(self):
+        for condition in ("admin", "missing database", "missing table", "busy"):
+            with self.subTest(condition=condition), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                (root / "bin").mkdir()
+                binary = root / "bin" / "memona"
+                binary.write_bytes(b"fixture")
+                binary.chmod(0o700)
+                data = root / "data"
+                data.mkdir(mode=0o700)
+                if condition != "missing database":
+                    database = data / "memona.db"
+                    with sqlite3.connect(database) as connection:
+                        if condition != "missing table":
+                            connection.execute("CREATE TABLE admin (id INTEGER PRIMARY KEY)")
+                            if condition == "admin":
+                                connection.execute("INSERT INTO admin VALUES (1)")
+                    database.chmod(0o600)
+                (data / ".writer.lock").write_bytes(b"")
+                with patch.object(setup.local, "ROOT", root), patch.object(setup.sys.stdin, "isatty", return_value=True), patch.object(setup.local, "writer_busy", return_value=condition == "busy"), patch.object(setup.getpass, "getpass") as password, patch.object(setup.os, "execve") as execve:
+                    with self.assertRaisesRegex(ValueError, "Data sudah ada"):
+                        setup.setup()
+                    password.assert_not_called()
+                    execve.assert_not_called()
 
     def test_noninteractive_never_executes_binary(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -50,7 +50,7 @@ serve: cache
 run:
 	python3 -B scripts/run.py "$(CONFIG)"
 
-setup:
+setup: build-go
 	python3 -B scripts/setup.py "$(CONFIG)"
 
 start:

@@ -15,7 +15,7 @@ def run(config="config.json"):
             raise ValueError("Target data bukan direktori; periksa config sebelum melanjutkan.")
         if data.is_dir() and local.writer_busy(data) is True:
             raise ValueError("Writer sedang aktif. Tidak membangun ulang atau menjalankan instance kedua.")
-        fresh = not data.exists()
+        fresh = not data.exists() or setup.interrupted_bootstrap(data)
     else:
         if path != local.ROOT / "config.json":
             raise ValueError("Config khusus belum ada; buat dan tinjau sebelum menjalankan.")

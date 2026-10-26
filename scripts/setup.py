@@ -4,8 +4,10 @@ import getpass
 import ipaddress
 import json
 import os
+import sqlite3
+import stat
 import sys
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import local
 
@@ -48,6 +50,25 @@ def network_config():
     return config
 
 
+def interrupted_bootstrap(data):
+    """Permit retry only for a private existing database with no admin."""
+    try:
+        directory = data.lstat()
+        database = (data / "memona.db").lstat()
+        if (not stat.S_ISDIR(directory.st_mode) or directory.st_uid != os.geteuid()
+                or directory.st_mode & 0o077 or not stat.S_ISREG(database.st_mode)
+                or database.st_uid != os.geteuid() or database.st_mode & 0o077):
+            return False
+        if local.writer_busy(data) is not False:
+            return False
+        uri = "file:" + quote(str(data / "memona.db"), safe="/") + "?mode=ro"
+        with sqlite3.connect(uri, uri=True, timeout=1) as connection:
+            count, = connection.execute("SELECT COUNT(*) FROM admin").fetchone()
+            return count == 0
+    except (OSError, sqlite3.Error, TypeError):
+        return False
+
+
 def setup(config="config.json"):
     binary = local.ROOT / "bin" / "memona"
     if not binary.is_file() or not os.access(binary, os.X_OK):
@@ -63,10 +84,10 @@ def setup(config="config.json"):
         if config_file != local.ROOT / "config.json":
             raise ValueError("Config khusus belum ada; buat dan tinjau lebih dulu.")
         data = local.ROOT / "data"
-    # Existing data may already contain a valid admin or an interrupted startup.
-    # Never try to reseed or change credentials from this command.
-    if data.exists():
-        raise ValueError("Data sudah ada. Untuk start rutin gunakan `make start`; setup tidak mereset akun.")
+    # A failed startup may have created the SQLite schema before admin bootstrap.
+    # Never reset an existing admin or guess when the database cannot be inspected.
+    if data.exists() and not interrupted_bootstrap(data):
+        raise ValueError("Data sudah ada atau tidak dapat dipastikan tanpa admin. Periksa data; untuk akun lama gunakan `make start`. Setup tidak mereset akun.")
     config_data = None if exists else network_config()
     password = getpass.getpass("Buat password admin (minimal 10 karakter): ")
     repeat = getpass.getpass("Ulangi password: ")
