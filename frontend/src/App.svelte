@@ -26,6 +26,7 @@
   let authBusy = $state(false);
   let view = $state<View>('notes');
   let sidebarOpen = $state(true);
+  let compactLayout = $state(false);
   let status = $state('Memeriksa sesi…');
   let error = $state('');
   let notes = $state<Note[]>([]);
@@ -158,7 +159,7 @@
     if (next !== 'keys') token = '';
     view = next; filters = { query: '', project: '', kind: '' };
     graphFilters = { query: '', project: '', archived: false };
-    if (window.matchMedia('(max-width: 760px)').matches) sidebarOpen = false;
+    if (compactLayout) sidebarOpen = false;
     await tick(); main?.focus();
     await loadView();
   }
@@ -288,15 +289,30 @@
     finally { registrySaving = false; }
   }
   onMount(() => {
-    if (window.matchMedia('(max-width: 760px)').matches) sidebarOpen = false;
+    const layout = window.matchMedia('(max-width: 1024px)');
+    function updateLayout() {
+      if (compactLayout !== layout.matches) {
+        compactLayout = layout.matches;
+        sidebarOpen = !layout.matches;
+      }
+    }
+    updateLayout();
+    layout.addEventListener('change', updateLayout);
     void api.request<{ csrf: string }>('/api/session').then(signedIn).catch(e => {
       signedOut(); status = 'Silakan masuk untuk melanjutkan.';
       if (!(e instanceof APIError && e.status === 401)) showError(e);
     });
-    return () => { api.reset(); };
+    return () => { layout.removeEventListener('change', updateLayout); api.reset(); };
   });
+  function closeMenuOnEscape(event: KeyboardEvent) {
+    if (event.key === 'Escape' && compactLayout && sidebarOpen && !detailOpen) {
+      sidebarOpen = false;
+      document.querySelector<HTMLButtonElement>('.sidebar-toggle')?.focus();
+    }
+  }
 </script>
 
+<svelte:window onkeydown={closeMenuOnEscape} />
 <a class="skip-link" href="#main">Lewati ke konten</a>
 <p class="sr-only" role="status" aria-live="polite">{status}</p>
 <div class="utility-controls">
@@ -314,11 +330,12 @@
     </div>
   </section>
 {:else if session === 'in'}
-  <div class="shell" class:sidebar-closed={!sidebarOpen}>
-    <button type="button" class="sidebar-toggle" aria-expanded={sidebarOpen} aria-controls="sidebar-content" aria-label={sidebarOpen ? 'Ciutkan menu navigasi' : 'Perluas menu navigasi'} title={sidebarOpen ? 'Ciutkan menu' : 'Perluas menu'} onclick={() => { sidebarOpen = !sidebarOpen; }}>
-      <Icon name="panel" /><span class="toggle-label">Memona</span><span class="toggle-chevron"><Icon name="chevron" /></span>
+  <div class="shell" class:sidebar-closed={!sidebarOpen} class:compact-layout={compactLayout}>
+    {#if compactLayout && sidebarOpen}<button type="button" class="sidebar-scrim" aria-label="Tutup menu navigasi" tabindex="-1" onclick={() => { sidebarOpen = false; }}></button>{/if}
+    <button type="button" class="sidebar-toggle" aria-expanded={sidebarOpen} aria-controls="sidebar-content" aria-label={compactLayout ? sidebarOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi' : sidebarOpen ? 'Ciutkan menu navigasi' : 'Perluas menu navigasi'} title={sidebarOpen ? 'Tutup menu' : 'Buka menu'} onclick={() => { sidebarOpen = !sidebarOpen; }}>
+      <Icon name="panel" /><span class="toggle-label">{compactLayout ? sidebarOpen ? 'Tutup menu' : 'Menu' : 'Memona'}</span><span class="toggle-chevron"><Icon name="chevron" /></span>
     </button>
-    <aside id="sidebar-content" class="sidebar" aria-label="Ruang kerja">
+    <aside id="sidebar-content" class="sidebar" aria-label="Ruang kerja" aria-hidden={compactLayout && !sidebarOpen} inert={compactLayout && !sidebarOpen}>
       <div class="sidebar-inner">
         <div class="sidebar-brand"><span class="brand-mark" aria-hidden="true">m</span><span class="nav-text">memona</span></div>
         <nav aria-label="Navigasi utama" class={`active-${view}`}>
@@ -330,8 +347,8 @@
         <div class="sidebar-bottom"><button type="button" class="secondary sidebar-logout" aria-label="Keluar" title={!sidebarOpen ? 'Keluar' : undefined} disabled={authBusy} onclick={logout}><Icon name="logout" /><span class="nav-text">Keluar</span></button></div>
       </div>
     </aside>
-    <main id="main" class:graph-workspace={view === 'graph'} tabindex="-1" bind:this={main!}>
-      <h1 class="sr-only">{titles[view]}</h1>
+    <main id="main" class:graph-workspace={view === 'graph'} tabindex="-1" inert={compactLayout && sidebarOpen} bind:this={main!}>
+      <header class="workspace-heading"><span class="eyebrow">RUANG KERJA / MEMONA</span><h1>{titles[view]}</h1></header>
       {#if error}<p id="error" role="alert">{error}</p>{/if}
       {#if view === 'notes' || view === 'skills'}
         <div class="actions"><button type="button" class="primary" disabled={contentSaving} onclick={() => { creating = !creating; }}>{creating ? 'Tutup editor baru' : 'Buat memori'}</button></div>

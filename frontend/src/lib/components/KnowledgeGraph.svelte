@@ -214,11 +214,11 @@
   .control-divider { width:1px; height:18px; margin:0 3px; background:var(--line); }
   .legend { position:absolute; left:16px; bottom:30px; display:flex; align-items:center; flex-wrap:wrap; gap:12px; max-width:calc(100% - 230px); color:var(--muted); font-size:.62rem; pointer-events:none; }
   .legend span { display:flex; align-items:center; gap:5px; }.legend i { width:14px; border-top:2px solid #568b9d; }.legend .supersedes { border-top:2px solid #c88745; }
-  @media(max-width:1000px) { .toolbar { max-width:none; flex-basis:100%; }.graph-frame { height:calc(100dvh - 190px); } }
+  @media(max-width:1000px) { .toolbar { max-width:none; flex-basis:100%; }.graph-frame { height:clamp(380px, 65dvh, 820px); min-height:380px; } }
   @media(max-width:520px) {
-    .knowledge { gap:10px; }.graph-header { gap:10px; }.heading { width:100%; justify-content:space-between; gap:8px; }h2 { font-size:.95rem; }.counts { font-size:.63rem; gap:3px; }.counts > span { margin:0 1px; }
-    .toolbar { gap:6px; flex-wrap:wrap; }.search-area { flex-basis:100%; }.project-field { flex:1; }.project-field select { font-size:.7rem; padding-left:9px; padding-right:22px; }.search-field input { font-size:.74rem; padding-left:10px; }.search-submit { flex-basis:44px; width:44px; }.filter-toggle { width:44px; }
-    .graph-frame { height:calc(100dvh - 235px); border-radius:11px; }.graph-controls { right:10px; bottom:10px; gap:0; }.legend { left:12px; bottom:74px; max-width:calc(100% - 24px); gap:10px; }.cap-notice { left:12px; top:10px; font-size:.6rem; }
-    .search-results { max-width:calc(100vw - 24px); }.filter-popover { max-width:calc(100vw - 24px); }.filter-popover { max-height:calc(100dvh - 190px); }
+    .knowledge { gap:10px; }.graph-header { gap:10px; }.heading { width:100%; justify-content:space-between; gap:8px; }h2 { font-size:.95rem; }.counts { font-size:.72rem; gap:3px; white-space:normal; }.counts > span { margin:0 1px; }
+    .toolbar { gap:8px; flex-wrap:wrap; }.search-area { flex-basis:100%; }.project-field { flex:1; }.project-field select { font-size:.88rem; padding-left:9px; padding-right:22px; }.search-field input { font-size:16px; padding-left:10px; }.search-submit { flex-basis:44px; width:44px; }.filter-toggle { width:44px; }
+    .graph-frame { height:clamp(380px, 58dvh, 680px); min-height:380px; border-radius:11px; }.graph-controls { right:10px; bottom:10px; gap:0; }.legend { left:12px; bottom:74px; max-width:calc(100% - 24px); gap:10px; }.cap-notice { left:12px; top:10px; font-size:.7rem; }
+    .search-results { width:min(300px, calc(100vw - 44px)); max-width:100%; }.filter-popover { max-width:calc(100vw - 24px); }.filter-popover { max-height:calc(100dvh - 190px); }
   }
 </style>
