@@ -96,6 +96,35 @@ func TestBootstrapRequired(t *testing.T) {
 		t.Fatal("bootstrap allowed without password")
 	}
 }
+func TestBootstrapPasswordLength(t *testing.T) {
+	for _, tc := range []struct {
+		name, password string
+		wantValid      bool
+	}{
+		{"nine bytes rejected", "123456789", false},
+		{"ten bytes accepted", "1234567890", true},
+		{"max bytes accepted", strings.Repeat("x", 1024), true},
+		{"over max rejected", strings.Repeat("x", 1025), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, err := Open(filepath.Join(t.TempDir(), "private"), tc.password)
+			if !tc.wantValid {
+				if err == nil {
+					s.Close()
+					t.Fatal("invalid bootstrap password accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			if _, _, err := s.Login(tc.password); err != nil {
+				t.Fatalf("valid bootstrap password cannot log in: %v", err)
+			}
+		})
+	}
+}
 func TestRejectDBSymlink(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "private")
 	if e := os.Mkdir(dir, 0700); e != nil {

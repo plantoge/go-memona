@@ -104,8 +104,8 @@ func Open(dir, password string) (*Store, error) {
 		return nil, err
 	}
 	if count == 0 {
-		if len(password) < 16 || len(password) > 1024 {
-			return nil, errors.New("first startup requires MEMONA_ADMIN_PASSWORD (16–1024 characters)")
+		if len(password) < 10 || len(password) > 1024 {
+			return nil, errors.New("first startup requires MEMONA_ADMIN_PASSWORD (10–1024 bytes)")
 		}
 		salt, e := Random()
 		if e != nil {

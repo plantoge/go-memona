@@ -6,33 +6,29 @@ Memona menyimpan memori proyek untuk manusia dan agen AI. Dashboard untuk admin;
 
 Pasang **Git, Go 1.26.8, Node.js 24 LTS (atau ≥22.18), npm, Make, Python 3, dan Bash** di home server. Gunakan akun Linux biasa, bukan root. Cek dengan `go version`, `node --version`, `npm --version`, `python3 --version`.
 
-## 2. Ambil kode dan pasang dependensi
+## 2. Ambil kode dan jalankan
 
 ```bash
 git clone URL_REPO_ANDA memona
 cd memona
-make build
+make run
 ```
 
-Ganti `URL_REPO_ANDA` dengan alamat repo Anda. `make build` otomatis menjalankan **npm ci** untuk Svelte, pemeriksaan/build UI, mengunduh modul Go sesuai `go.mod`/`go.sum`, lalu membuat `bin/memona`. Perlu internet saat build pertama; Node/npm tidak dibutuhkan saat binary berjalan. Perubahan lokal yang belum di-commit dan di-push tidak ikut dalam clone.
+Ganti `URL_REPO_ANDA` dengan alamat repo Anda. **`make run` adalah satu perintah setelah clone:** memasang dependensi Svelte (`npm ci`), membangun Svelte+Go menjadi `bin/memona`, menyiapkan instalasi pertama, lalu menjalankan server. Perlu internet saat build pertama; Node/npm tidak dibutuhkan saat binary berjalan. Perubahan lokal yang belum di-commit dan di-push tidak ikut dalam clone.
 
-## 3. Buat akun admin dan jalankan (pertama kali)
+## 3. Saat pertama kali
 
-```bash
-make setup
-```
+`make run` meminta pilihan **lokal**, **LAN/Tailscale privat**, atau **HTTPS lewat reverse proxy**, membuat `config.json` **hanya jika belum ada**, lalu meminta password admin dua kali tanpa menampilkannya (minimal 10 karakter ASCII; gunakan password acak yang lebih panjang bila memungkinkan). Go membuat akun admin tunggal dan tabel SQLite saat startup pertama; tidak ada seeder, migrasi manual, atau password bawaan. Hentikan normal dengan **Ctrl+C**.
 
-Perintah ini membuat `config.json` lokal hanya jika belum ada, meminta **password admin dua kali tanpa menampilkannya** (minimal 16 karakter ASCII), lalu menjalankan aplikasi di terminal. Tidak ada username terpisah, seeder, migrasi manual, atau password bawaan: Go membuat akun admin tunggal dan tabel SQLite saat startup pertama. `make setup` **menolak data yang sudah ada** dan tidak mereset password. Hentikan normal dengan **Ctrl+C**.
+Buka alamat yang ditampilkan di `config.json`: lokal **http://127.0.0.1:8765**; LAN/Tailscale memakai IP privat yang dimasukkan. HTTP privat hanya untuk jaringan tepercaya—**jangan port-forward ke internet**. Untuk domain HTTPS, Memona tetap di localhost; siapkan reverse proxy TLS (misalnya Nginx atau Caddy) dan sertifikat secara terpisah. Proxy **tidak wajib** untuk akses lokal/privat. Lihat [akses jaringan](docs/network.md).
 
-Buka **http://127.0.0.1:8765** di mesin server. Untuk mengakses dari komputer lain, gunakan SSH tunnel atau [proxy HTTPS yang dikonfigurasi terpisah](docs/network.md); default hanya mendengar di localhost. **Jangan port-forward HTTP langsung ke internet.**
-
-## 4. Jalankan lagi
+## 4. Jalankan lagi tanpa build
 
 ```bash
 make start
 ```
 
-Dari folder proyek, tanpa build/isi password lagi. `make status` untuk melihat indikasi proses aktif. Keduanya berjalan lokal; `make start` tetap di foreground dan tidak otomatis hidup setelah reboot. Alternatif tanpa launcher: `./bin/memona serve -config config.json`.
+Dari folder proyek, tanpa build/isi password lagi. `make run` juga bisa dipakai lagi bila ingin **build ulang lalu start**, tanpa membuat ulang akun/config; menolak jika server masih aktif. `make status` untuk melihat indikasi proses aktif. `make start` tetap di foreground dan tidak otomatis hidup setelah reboot.
 
 Di dashboard, buat API key berbeda untuk tiap agen melalui menu **MCP Server**; token tampil sekali. Jangan gunakan password admin sebagai API key.
 

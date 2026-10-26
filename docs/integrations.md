@@ -76,7 +76,7 @@ Panduan: [OpenCode V2](../integrations/opencode-memory.md) dan [Hermes](../integ
 Semua langkah di bawah **manual pending** sampai ada bukti aktual. Gunakan data sintetis, bukan data pribadi atau secret.
 
 1. Catat tanggal, versi Go, versi aplikasi/commit/hash binary, versi OpenCode V2 dan Hermes, OS, URL, serta konfigurasi nonsecret. Jalankan `make test`, `make race`, `make vet`, `make build`; simpan exit code dan hasil yang telah disunting dari secret.
-2. Siapkan konfigurasi/data baru yang terisolasi dan disetujui. Uji bootstrap tanpa password dan dengan password kurang dari 16 karakter: startup harus gagal. Masukkan password valid lewat prompt tersembunyi dan jalankan `memona serve` sesuai README.
+2. Siapkan konfigurasi/data baru yang terisolasi dan disetujui. Uji bootstrap tanpa password dan dengan password kurang dari 10 byte: startup harus gagal. Masukkan password valid lewat prompt tersembunyi dan jalankan `memona serve` sesuai README.
 3. Login UI; gunakan proyek sintetis `acceptance-demo` dan `acceptance-other`. Buat key berbeda untuk OpenCode dan Hermes, scope hanya `acceptance-demo`, izin `read`, `write`, `archive`. Buat juga key read-only untuk uji negatif. Tidak perlu scope `*` untuk skenario ini.
 4. Gabungkan snippet integrasi pada konfigurasi/profil yang benar, tanpa menghapus konfigurasi lain. Pastikan dua harness melakukan discovery pada `/mcp` dan menemukan sepuluh tool di atas. Catat nama wrapper aktual dan skema, tanpa key.
 5. Gunakan penanda sintetis unik, misalnya `MEMONA-ACCEPT-<tanggal>-<run-id>`, agar hasil tidak tertukar dengan percobaan sebelumnya. Jangan membersihkan data uji dengan hard delete; arsipkan sesuai izin bila selesai.

@@ -6,8 +6,8 @@
 
 ## Admin browser
 
-- Bootstrap pertama memerlukan `MEMONA_ADMIN_PASSWORD` minimal 16 karakter; tanpa nilai yang memenuhi syarat startup pada database baru harus gagal. Tidak ada kredensial default.
-- Source menyimpan hash password PBKDF2-HMAC-SHA256, 600.000 iterasi, 32 byte, dengan salt acak di database; bukan plaintext. Batas input bootstrap aktual adalah 16–1.024 **byte** (`len` string Go); gunakan minimal 16 karakter ASCII acak agar tidak ambigu. Variabel bootstrap pada restart tidak menimpa admin yang sudah ada.
+- Bootstrap pertama memerlukan `MEMONA_ADMIN_PASSWORD` minimal 10 byte; tanpa nilai yang memenuhi syarat startup pada database baru harus gagal. Tidak ada kredensial default.
+- Source menyimpan hash password PBKDF2-HMAC-SHA256, 600.000 iterasi, 32 byte, dengan salt acak di database; bukan plaintext. Batas input bootstrap aktual adalah 10–1.024 **byte** (`len` string Go); gunakan password acak yang lebih panjang bila memungkinkan (minimal 10 karakter ASCII agar panjang byte tidak ambigu). Batas baru lebih rendah dari sebelumnya: password pendek lebih mudah ditebak, terutama jika layanan dapat diakses lewat jaringan. Variabel bootstrap pada restart tidak menimpa admin yang sudah ada.
 - Gunakan password unik dari password manager; masukkan lewat prompt tersembunyi. Jangan log environment, body login, cookie, atau header Authorization.
 - Sesi browser memakai cookie `HttpOnly`, `SameSite=Strict`, dan `Secure` untuk HTTPS publik (`secure_cookies: true`). Token CSRF diperlukan untuk mutasi browser; bearer MCP bukan pengganti CSRF untuk UI.
 - Terapkan pemeriksaan same-origin dan host berdasarkan `public_url`; jangan mengendurkan validasi untuk memperbaiki konfigurasi proxy. Local URL `127.0.0.1` dan `localhost` tidak otomatis identik.

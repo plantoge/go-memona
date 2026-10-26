@@ -32,11 +32,13 @@ Domain contoh harus diganti sebelum dipakai. Jangan membuka URL contoh atau memb
 
 ## Bootstrap dan menjalankan
 
-Pada instalasi baru setelah `make build`, `make setup` (terminal interaktif) membuat config lokal jika belum ada, meminta password admin dua kali tanpa echo, lalu menjalankan binary di foreground. Data yang sudah ada ditolak oleh setup; jalankan `make start` untuk restart rutin. Bootstrap tetap dilakukan Go saat startup, bukan seeder akun default. Lihat langkah singkat pada [README](../README.md).
+Untuk clone baru ada pintasan `make run`: satu perintah dari root repo untuk membangun frontend+Go, membuat config (jika belum ada), meminta pilihan akses/password admin pada instalasi pertama, lalu menjalankan server foreground. Jika data/config sudah ada, ia membangun ulang dan menjalankan akun lama tanpa reset; `make start` lebih cepat bila tidak perlu build. `make run` tidak memasang service/proxy/firewall/DNS atau memindahkan data dan menolak writer aktif. Lihat [README singkat](../README.md).
+
+Pada instalasi baru setelah `make build`, `make setup` (terminal interaktif) menawarkan lokal, HTTP privat LAN/Tailscale, atau HTTPS via proxy TLS. Pilihan membuat config baru saja (config existing tidak ditimpa), lalu meminta password admin dua kali tanpa echo dan menjalankan binary di foreground. Opsi HTTPS hanya menyiapkan config Memona loopback; proxy/sertifikat harus disiapkan terpisah. Data yang sudah ada ditolak oleh setup; jalankan `make start` untuk restart rutin. Bootstrap tetap dilakukan Go saat startup, bukan seeder akun default. Lihat langkah singkat pada [README](../README.md).
 
 Setelah bootstrap pertama dan binary dibuild, alur rutin dari root proyek lebih singkat: `make status`, kemudian `make start` (foreground; Ctrl+C untuk stop). `make start` memakai binary `bin/memona` tanpa build/instalasi/penulisan konfigurasi, dan menolak bila direktori data/lock belum ada atau writer sedang aktif. `make status` memeriksa lock existing dan `/healthz` pada listener loopback; untuk bind wildcard hanya menghubungi loopback dengan Host dari public_url, **tidak** menghubungi URL publik. Lock tanpa HTTP sehat bukan bukti aplikasi siap, begitu pula HTTP tanpa lock data yang sama. Kedua indikator bersama pun tidak membuktikan identitas proses atau bahwa HTTP melayani data yang sama; periksa proses saat meragukan. Pada listener IP jaringan spesifik, probe jaringan dilewati dan status mungkin belum terkonfirmasi. Perintah ini tidak mengelola service, tidak memulihkan password, dan tidak menggantikan backup/monitoring. Untuk config berbeda gunakan `make status CONFIG=...` dan `make start CONFIG=...` setelah meninjau targetnya.
 
-Ikuti prompt password di [README](../README.md). Bootstrap wajib pada database baru, minimum 16 karakter, tanpa default; hash bersalt disimpan, admin lama tidak ditimpa saat restart. Aplikasi tidak menjanjikan auto-load `.env`.
+Ikuti prompt password di [README](../README.md). Bootstrap wajib pada database baru, minimum 10 byte, tanpa default; hash bersalt disimpan, admin lama tidak ditimpa saat restart. Aplikasi tidak menjanjikan auto-load `.env`.
 
 ```bash
 make build

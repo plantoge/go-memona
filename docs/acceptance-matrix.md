@@ -54,7 +54,7 @@ Prasyarat: bootstrap instance uji disetujui, proyek/key sintetis scoped `accepta
 | REV01 | Dua klien membaca N, A revise N, B revise N. | B konflik; read ulang sebelum gabungan sadar. Simpan receipt N/N+1 dan konflik. | Pending. |
 | LIFE01 | Archive dengan revisi benar; search/context aktif; admin restore via UI. | Tidak ada hard delete; archive receipt saja, histori tetap; restore menambah revisi. | Pending. |
 | SKILL01 | Agen simpan draft; get_skill; admin publish; get dari dua harness; revise lagi. | Draft tidak diambil sebagai active, publish hanya admin; revisi kembali draft, perlu review ulang. UI tombol publish/error diperiksa. | Pending. |
-| BOOT01 | Instance baru tanpa/kurang dari 16 karakter bootstrap; lalu bootstrap valid via mekanisme privat. | Startup gagal untuk input invalid; tidak ada default password. Jangan simpan nilai secret dalam evidence. | Pending. |
+| BOOT01 | Instance baru tanpa/kurang dari 10 byte bootstrap; lalu bootstrap valid via mekanisme privat. | Startup gagal untuk input invalid; tidak ada default password. Jangan simpan nilai secret dalam evidence. | Pending. |
 | BOOT02 | Restart instance uji dengan bootstrap berbeda setelah admin ada. | Password admin lama tidak tertimpa; operasi rutin tanpa bootstrap. | Pending. |
 | LOCK01 | Proses kedua terhadap data sintetis yang sama; stop normal pertama lalu buka ulang. | Proses kedua ditolak; lock tidak dihapus paksa; revisi utuh saat reopen. | Pending. |
 | WEB01 | Browser nyata login salah/benar, logout, akses sebelum login, kedaluwarsa sesi. | Otorisasi dan batas sesi 8 jam sesuai kontrak; catat elapsed time/metode, jangan mengklaim expiry dari review saja. | Pending — browser. |
