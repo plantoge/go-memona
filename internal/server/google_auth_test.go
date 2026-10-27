@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"math/big"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -87,5 +89,41 @@ func TestGoogleStateSingleUse(t *testing.T) {
 	}
 	if _, ok := g.consume("state"); ok {
 		t.Fatal("replayed state")
+	}
+}
+
+func TestGoogleLoginWithPrivateHTTPAndTunnel(t *testing.T) {
+	f := setup(t)
+	a, err := New(Config{Listen: "192.168.1.5:8765", PublicURL: "http://192.168.1.5:8765", TunnelURL: "https://memona.example.com", AllowPrivateHTTP: true, GoogleClientID: "example", GoogleClientSecret: "synthetic"}, f.auth, f.notes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.google.redirectURI != "https://memona.example.com/auth/google/callback" {
+		t.Fatalf("wrong callback URI: %s", a.google.redirectURI)
+	}
+	request := func(host, path string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodGet, "http://192.168.1.5:8765"+path, nil)
+		r.Host = host
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, r)
+		return w
+	}
+	if w := request("192.168.1.5:8765", "/auth/google/start"); w.Code != 403 || len(w.Result().Cookies()) != 0 {
+		t.Fatalf("private HTTP Google start: %d", w.Code)
+	}
+	w := request("memona.example.com", "/auth/google/start")
+	if w.Code != http.StatusFound {
+		t.Fatalf("tunnel Google start: %d", w.Code)
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || !cookies[0].Secure || !cookies[0].HttpOnly {
+		t.Fatal("Google state cookie is not secure")
+	}
+	location, err := url.Parse(w.Header().Get("Location"))
+	if err != nil || location.Query().Get("redirect_uri") != a.google.redirectURI {
+		t.Fatalf("wrong OAuth redirect URI: %v", err)
+	}
+	if w := request("192.168.1.5:8765", "/auth/google/callback"); w.Code != 403 {
+		t.Fatalf("private HTTP Google callback: %d", w.Code)
 	}
 }

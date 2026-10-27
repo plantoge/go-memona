@@ -50,6 +50,10 @@ func (a *App) googleStart(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "Login Google tidak tersedia.")
 		return
 	}
+	if a.tunnelHost != "" && !strings.EqualFold(r.Host, a.tunnelHost) {
+		fail(w, 403, "Login Google hanya tersedia melalui tunnel HTTPS.")
+		return
+	}
 	if !a.security.loginPeers.Allow(directPeer(r), time.Now()) || !a.loginLimit.Allow() {
 		fail(w, 429, "Terlalu banyak percobaan.")
 		return
@@ -86,7 +90,7 @@ func (a *App) googleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	g.attempts[state] = googleAttempt{verifier, nonce, time.Now().Add(5 * time.Minute)}
 	g.mu.Unlock()
-	http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: state, Path: "/auth/google", HttpOnly: true, Secure: a.cfg.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: 300})
+	http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: state, Path: "/auth/google", HttpOnly: true, Secure: a.cfg.SecureCookies || a.tunnelHost != "", SameSite: http.SameSiteLaxMode, MaxAge: 300})
 	challenge := sha256.Sum256([]byte(verifier))
 	params := url.Values{"client_id": {g.clientID}, "redirect_uri": {g.redirectURI}, "response_type": {"code"}, "scope": {"openid email profile"}, "state": {state}, "nonce": {nonce}, "code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])}, "code_challenge_method": {"S256"}}
 	http.Redirect(w, r, googleAuthURL+"?"+params.Encode(), http.StatusFound)
@@ -125,7 +129,11 @@ func (a *App) googleCallback(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, "Login Google tidak tersedia.")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: "", Path: "/auth/google", HttpOnly: true, Secure: a.cfg.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	if a.tunnelHost != "" && !strings.EqualFold(r.Host, a.tunnelHost) {
+		fail(w, 403, "Login Google hanya tersedia melalui tunnel HTTPS.")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: oauthStateCookie, Value: "", Path: "/auth/google", HttpOnly: true, Secure: a.cfg.SecureCookies || a.tunnelHost != "", SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	c, err := r.Cookie(oauthStateCookie)
 	state := r.URL.Query().Get("state")
 	if err != nil || len(state) != 43 || subtle.ConstantTimeCompare([]byte(c.Value), []byte(state)) != 1 {
@@ -156,7 +164,7 @@ func (a *App) googleCallback(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: userCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: 8 * 60 * 60})
+	http.SetCookie(w, &http.Cookie{Name: userCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies || a.tunnelHost != "", SameSite: http.SameSiteLaxMode, MaxAge: 8 * 60 * 60})
 	a.audit("user:"+user.ID, "login", "")
 	http.Redirect(w, r, "/user", http.StatusSeeOther)
 }
@@ -200,7 +208,7 @@ func (a *App) userLogout(w http.ResponseWriter, r *http.Request) {
 		a.internal(w, err)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: userCookie, Value: "", Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: userCookie, Value: "", Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies || a.tunnelHost != "", SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	a.audit("user:"+u.ID, "logout", "")
 	respond(w, 200, map[string]bool{"ok": true})
 }

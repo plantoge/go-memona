@@ -14,7 +14,7 @@
 
 ## Mengaktifkan login Google
 
-1. Buat OAuth Client tipe **Web application** dan consent screen di Google Cloud Console. Daftarkan **Authorized redirect URI** yang persis sama dengan `<public_url>/auth/google/callback`. Untuk penggunaan publik gunakan HTTPS dengan TLS reverse proxy dan `secure_cookies: true`; HTTP hanya untuk loopback development yang memenuhi validasi konfigurasi. Memona tidak melakukan terminasi TLS sendiri.
+1. Buat OAuth Client tipe **Web application** dan consent screen di Google Cloud Console. Daftarkan **Authorized redirect URI** yang persis sama dengan `<public_url>/auth/google/callback`; bila `tunnel_url` dikonfigurasi, gunakan `<tunnel_url>/auth/google/callback` dan buka login Google melalui hostname tunnel HTTPS, bukan alamat HTTP privat. Untuk penggunaan publik gunakan HTTPS dengan TLS reverse proxy dan `secure_cookies: true`; HTTP hanya untuk loopback development yang memenuhi validasi konfigurasi atau akses privat tanpa login Google melalui tunnel HTTPS. Memona tidak melakukan terminasi TLS sendiri.
 2. Atur `google_client_id` dan `google_client_secret` dalam `config.json` lokal. Keduanya wajib disediakan bersama. Contoh bentuknya (placeholder **bukan** kredensial asli):
 
    ```json

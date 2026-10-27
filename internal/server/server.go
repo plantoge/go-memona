@@ -27,24 +27,27 @@ type Config struct {
 	Listen             string `json:"listen"`
 	DataDir            string `json:"data_dir"`
 	PublicURL          string `json:"public_url"`
+	TunnelURL          string `json:"tunnel_url"`
 	SecureCookies      bool   `json:"secure_cookies"`
 	AllowPrivateHTTP   bool   `json:"allow_private_http"`
 	GoogleClientID     string `json:"google_client_id,omitempty"`
 	GoogleClientSecret string `json:"google_client_secret,omitempty"`
 }
 type App struct {
-	cfg        Config
-	origin     string
-	host       string
-	auth       *access.Store
-	notes      *memory.Store
-	loginLimit *rate.Limiter
-	mcpLimit   *rate.Limiter
-	handler    http.Handler
-	workSlots  chan struct{}
-	keyLimits  *keyLimiter
-	security   *requestSecurity
-	google     *googleOIDC
+	cfg          Config
+	origin       string
+	host         string
+	tunnelHost   string
+	tunnelOrigin string
+	auth         *access.Store
+	notes        *memory.Store
+	loginLimit   *rate.Limiter
+	mcpLimit     *rate.Limiter
+	handler      http.Handler
+	workSlots    chan struct{}
+	keyLimits    *keyLimiter
+	security     *requestSecurity
+	google       *googleOIDC
 }
 type authenticatedKeyContext struct{}
 
@@ -82,9 +85,6 @@ func ValidateConfig(cfg Config) error {
 	if u.Scheme == "https" && !cfg.SecureCookies {
 		return errors.New("HTTPS public_url requires secure_cookies=true")
 	}
-	if cfg.GoogleClientID != "" && u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1") && !cfg.AllowPrivateHTTP) {
-		return errors.New("Google login requires HTTPS public_url except loopback development")
-	}
 	if cfg.AllowPrivateHTTP {
 		if u.Scheme != "http" || !privateIP(u.Hostname()) || cfg.SecureCookies {
 			return errors.New("allow_private_http requires a private/loopback/Tailscale HTTP URL and secure_cookies=false")
@@ -101,6 +101,18 @@ func ValidateConfig(cfg Config) error {
 			return errors.New("public HTTP is not supported; use HTTPS")
 		}
 	}
+	if cfg.TunnelURL != "" {
+		if !cfg.AllowPrivateHTTP {
+			return errors.New("tunnel_url requires allow_private_http=true")
+		}
+		tunnel, err := url.Parse(cfg.TunnelURL)
+		if err != nil || tunnel.Scheme != "https" || tunnel.Host == "" || tunnel.User != nil || tunnel.RawQuery != "" || tunnel.Fragment != "" || (tunnel.Path != "" && tunnel.Path != "/") || tunnel.Port() != "" || net.ParseIP(tunnel.Hostname()) != nil {
+			return errors.New("tunnel_url must be an HTTPS hostname without port, path or credentials")
+		}
+	}
+	if cfg.GoogleClientID != "" && u.Scheme != "https" && cfg.TunnelURL == "" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1") && !cfg.AllowPrivateHTTP) {
+		return errors.New("Google login requires HTTPS public_url or tunnel_url except loopback development")
+	}
 	return nil
 }
 
@@ -110,10 +122,19 @@ func New(cfg Config, auth *access.Store, notes *memory.Store) (*App, error) {
 	}
 	u, _ := url.Parse(cfg.PublicURL)
 	a := &App{cfg: cfg, origin: u.Scheme + "://" + u.Host, host: u.Host, auth: auth, notes: notes, loginLimit: rate.NewLimiter(rate.Every(12*time.Second), 5), mcpLimit: rate.NewLimiter(30, 60), workSlots: make(chan struct{}, 8)}
+	if cfg.TunnelURL != "" {
+		tunnel, _ := url.Parse(cfg.TunnelURL)
+		a.tunnelHost = tunnel.Host
+		a.tunnelOrigin = "https://" + tunnel.Host
+	}
 	a.keyLimits = newKeyLimiter(4096, 10, 20, 15*time.Minute)
 	a.security = newRequestSecurity()
 	if cfg.GoogleClientID != "" {
-		a.google = &googleOIDC{clientID: cfg.GoogleClientID, clientSecret: cfg.GoogleClientSecret, redirectURI: a.origin + "/auth/google/callback", client: &http.Client{Timeout: 10 * time.Second}}
+		googleOrigin := a.origin
+		if a.tunnelHost != "" {
+			googleOrigin = a.tunnelOrigin
+		}
+		a.google = &googleOIDC{clientID: cfg.GoogleClientID, clientSecret: cfg.GoogleClientSecret, redirectURI: googleOrigin + "/auth/google/callback", client: &http.Client{Timeout: 10 * time.Second}}
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /auth/google/start", a.googleStart)
@@ -146,12 +167,16 @@ func (a *App) boundary(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
-		if a.cfg.SecureCookies {
+		isTunnel := a.tunnelHost != "" && strings.EqualFold(r.Host, a.tunnelHost)
+		if a.cfg.SecureCookies || isTunnel {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		expectedOrigin := a.origin
 		allowedHost := strings.EqualFold(r.Host, a.host)
-		if a.cfg.AllowPrivateHTTP {
+		if isTunnel {
+			allowedHost = true
+			expectedOrigin = a.tunnelOrigin
+		} else if a.cfg.AllowPrivateHTTP {
 			host, port, err := net.SplitHostPort(r.Host)
 			_, listenPort, _ := net.SplitHostPort(a.cfg.Listen)
 			allowedHost = err == nil && port == listenPort && privateIP(host)
@@ -244,7 +269,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "Login gagal.")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: "memona_session", Value: token, Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies, SameSite: http.SameSiteStrictMode, MaxAge: 8 * 60 * 60})
+	http.SetCookie(w, &http.Cookie{Name: "memona_session", Value: token, Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies || (a.tunnelHost != "" && strings.EqualFold(r.Host, a.tunnelHost)), SameSite: http.SameSiteStrictMode, MaxAge: 8 * 60 * 60})
 	a.audit("admin", "login", "")
 	respond(w, 200, map[string]string{"csrf": csrf})
 }
@@ -294,11 +319,15 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			a.internal(w, e)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "memona_session", Value: "", Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies, SameSite: http.SameSiteStrictMode, MaxAge: -1})
+		http.SetCookie(w, &http.Cookie{Name: "memona_session", Value: "", Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies || (a.tunnelHost != "" && strings.EqualFold(r.Host, a.tunnelHost)), SameSite: http.SameSiteStrictMode, MaxAge: -1})
 		respond(w, 200, map[string]bool{"ok": true})
 	case path == "server-info" && r.Method == "GET":
+		publicURL := a.cfg.PublicURL
+		if a.tunnelHost != "" && strings.EqualFold(r.Host, a.tunnelHost) {
+			publicURL = a.cfg.TunnelURL
+		}
 		respond(w, 200, map[string]string{
-			"mcp_endpoint": strings.TrimRight(a.cfg.PublicURL, "/") + "/mcp",
+			"mcp_endpoint": strings.TrimRight(publicURL, "/") + "/mcp",
 			"transport":    "Streamable HTTP",
 		})
 	case path == "request-security" && r.Method == "GET":
