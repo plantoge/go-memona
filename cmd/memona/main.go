@@ -52,6 +52,9 @@ func run() error {
 	if err = d.Decode(&cfg); err != nil {
 		return err
 	}
+	if err = checkGoogleConfigFile(*configFile, f, cfg); err != nil {
+		return err
+	}
 	if err = server.ValidateConfig(cfg); err != nil {
 		return err
 	}
@@ -99,4 +102,26 @@ func run() error {
 		defer cancel()
 		return srv.Shutdown(shutdown)
 	}
+}
+
+// A config with an OAuth client secret must be a private file owned by the
+// running user. Compare the opened descriptor with the path to reject symlink
+// indirection or a path replaced while the configuration was being read.
+func checkGoogleConfigFile(path string, f *os.File, cfg server.Config) error {
+	if cfg.GoogleClientID == "" && cfg.GoogleClientSecret == "" {
+		return nil
+	}
+	opened, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	entry, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	stat, ok := opened.Sys().(*syscall.Stat_t)
+	if !opened.Mode().IsRegular() || !entry.Mode().IsRegular() || !os.SameFile(opened, entry) || opened.Mode().Perm()&0077 != 0 || !ok || stat.Uid != uint32(os.Geteuid()) {
+		return errors.New("config with Google credentials must be an owned regular file with permission 0600; do not use a symlink")
+	}
+	return nil
 }

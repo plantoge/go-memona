@@ -143,6 +143,9 @@ func (a *App) mcpServerContext(requestCtx context.Context, k access.Key) *mcp.Se
 		out := contextResult{Notes: []noteView{}, Guidance: "Project summaries are prioritized, then lexical task relevance (title > content > source), durable notes and recency. Mixed context includes at most 2 handoffs; use kind=handoff to retrieve more explicitly. Category/output omissions set truncated=true. Explicit is_testing notes are excluded by default; include_testing=true opts in. Search/read can inspect them. No stemming, semantic inference or automatic classification of old notes. Superseded notes are omitted from context; search/read explicitly for history. Connections are bounded one-hop references, not automatically loaded. needs_review is an explicit unresolved-review warning, not automatically resolved by verified status. verified_at is author-declared, not server verification. Conflicting statements are not resolved by recency; inspect sources and explicit supersedes. Context may be incomplete; verify current state."}
 		if in.Project == "" {
 			in.Project = "global"
+			if k.WorkspaceID != "" && len(k.Projects) == 1 {
+				in.Project = k.Projects[0]
+			}
 		}
 		if !k.Allows("read", in.Project) {
 			return nil, out, access.ErrDenied

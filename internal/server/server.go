@@ -24,11 +24,13 @@ import (
 )
 
 type Config struct {
-	Listen           string `json:"listen"`
-	DataDir          string `json:"data_dir"`
-	PublicURL        string `json:"public_url"`
-	SecureCookies    bool   `json:"secure_cookies"`
-	AllowPrivateHTTP bool   `json:"allow_private_http"`
+	Listen             string `json:"listen"`
+	DataDir            string `json:"data_dir"`
+	PublicURL          string `json:"public_url"`
+	SecureCookies      bool   `json:"secure_cookies"`
+	AllowPrivateHTTP   bool   `json:"allow_private_http"`
+	GoogleClientID     string `json:"google_client_id,omitempty"`
+	GoogleClientSecret string `json:"google_client_secret,omitempty"`
 }
 type App struct {
 	cfg        Config
@@ -42,6 +44,7 @@ type App struct {
 	workSlots  chan struct{}
 	keyLimits  *keyLimiter
 	security   *requestSecurity
+	google     *googleOIDC
 }
 type authenticatedKeyContext struct{}
 
@@ -57,6 +60,9 @@ func privateIP(host string) bool {
 
 // Memona serves HTTP directly or to a TLS reverse proxy.
 func ValidateConfig(cfg Config) error {
+	if (cfg.GoogleClientID == "") != (cfg.GoogleClientSecret == "") {
+		return errors.New("Google login requires both google_client_id and google_client_secret")
+	}
 	host, port, err := net.SplitHostPort(cfg.Listen)
 	if err != nil {
 		return errors.New("listen must be an explicit IP:port, such as 0.0.0.0:8765")
@@ -75,6 +81,9 @@ func ValidateConfig(cfg Config) error {
 	}
 	if u.Scheme == "https" && !cfg.SecureCookies {
 		return errors.New("HTTPS public_url requires secure_cookies=true")
+	}
+	if cfg.GoogleClientID != "" && u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1") && !cfg.AllowPrivateHTTP) {
+		return errors.New("Google login requires HTTPS public_url except loopback development")
 	}
 	if cfg.AllowPrivateHTTP {
 		if u.Scheme != "http" || !privateIP(u.Hostname()) || cfg.SecureCookies {
@@ -103,7 +112,15 @@ func New(cfg Config, auth *access.Store, notes *memory.Store) (*App, error) {
 	a := &App{cfg: cfg, origin: u.Scheme + "://" + u.Host, host: u.Host, auth: auth, notes: notes, loginLimit: rate.NewLimiter(rate.Every(12*time.Second), 5), mcpLimit: rate.NewLimiter(30, 60), workSlots: make(chan struct{}, 8)}
 	a.keyLimits = newKeyLimiter(4096, 10, 20, 15*time.Minute)
 	a.security = newRequestSecurity()
+	if cfg.GoogleClientID != "" {
+		a.google = &googleOIDC{clientID: cfg.GoogleClientID, clientSecret: cfg.GoogleClientSecret, redirectURI: a.origin + "/auth/google/callback", client: &http.Client{Timeout: 10 * time.Second}}
+	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /auth/google/start", a.googleStart)
+	mux.HandleFunc("GET /auth/google/callback", a.googleCallback)
+	mux.HandleFunc("GET /api/user/session", a.userSession)
+	mux.HandleFunc("POST /api/user/logout", a.userLogout)
+	mux.HandleFunc("/api/user/", a.userAPI)
 	mux.HandleFunc("POST /api/login", a.login)
 	mux.Handle("/api/", a.admin(http.HandlerFunc(a.api)))
 	mh := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server {
@@ -148,7 +165,7 @@ func (a *App) boundary(next http.Handler) http.Handler {
 			fail(w, 403, "origin not allowed")
 			return
 		}
-		if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		if r.Header.Get("Sec-Fetch-Site") == "cross-site" && !a.googleCallbackNavigation(r) {
 			fail(w, 403, "cross-site request denied")
 			return
 		}

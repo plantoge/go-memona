@@ -1,6 +1,6 @@
 # Memona
 
-Memona menyimpan memori proyek untuk manusia dan agen AI. Dashboard untuk admin; OpenCode/Hermes terhubung lewat API key. Panduan ini untuk **instalasi baru di Linux** (bukan pemindahan data lama).
+Memona menyimpan memori proyek untuk manusia dan agen AI. Dashboard admin dan ruang pengguna Google/team terpisah; OpenCode/Hermes terhubung lewat API key. Login Google hanya aktif bila kredensial OAuth dikonfigurasi. Lihat [akun dan team](docs/akun-team.md) sebelum mengaktifkannya. Panduan ini untuk **instalasi baru di Linux** (bukan pemindahan data lama).
 
 ## 1. Siapkan alat build
 
@@ -32,6 +32,8 @@ make start
 
 Dari folder proyek, tanpa build/isi password lagi. `make run` juga bisa dipakai lagi bila ingin **build ulang lalu start**, tanpa membuat ulang akun/config; menolak jika server masih aktif. `make status` untuk melihat indikasi proses aktif. `make start` tetap di foreground dan tidak otomatis hidup setelah reboot.
 
-Di dashboard, buat API key berbeda untuk tiap agen melalui menu **MCP Server**; token tampil sekali. Jangan gunakan password admin sebagai API key.
+Di dashboard admin (`/admin` atau `/`), buat API key berbeda untuk tiap agen lama melalui menu **MCP Server**; token tampil sekali. Pengguna Google (bila dikonfigurasi) masuk di `/user` dan dapat membuat key untuk memori pribadi atau team. Jangan gunakan password admin sebagai API key.
+
+Untuk mengaktifkan Google, isi `google_client_id` dan `google_client_secret` di `config.json` lokal, pastikan file privat (`0600`), dan cocokkan redirect URI dengan `public_url`; lihat [panduan akun/team](docs/akun-team.md). Jangan masukkan secret ke Git atau chat.
 
 **Sebelum dipakai sebagai layanan production:** atur HTTPS/reverse proxy dan cookie Secure, jalankan dengan akun non-root, uji login dan akses agen, rencanakan startup otomatis serta [backup/restore](docs/operations.md) dengan downtime. Repo belum memasang service atau proxy; `make start` saja **bukan deployment production otomatis**. `git clone` tidak membawa `data/` maupun akun admin dari server lain. Lihat [operasi](docs/operations.md), [keamanan](docs/security.md), dan [integrasi](docs/integrations.md) untuk langkah lanjutan.

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   plugins: [svelte()],
@@ -8,6 +9,12 @@ export default defineConfig({
     // Keep existing generated releases; no automatic deletion of project files.
     emptyOutDir: false,
     sourcemap: false,
+    rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL('./index.html', import.meta.url)),
+        user: fileURLToPath(new URL('./user.html', import.meta.url)),
+      },
+    },
   },
   server: {
     host: '127.0.0.1',

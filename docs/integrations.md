@@ -4,6 +4,8 @@
 
 Endpoint MCP: `/mcp`, transport HTTP dengan `Authorization: Bearer …`. Browser admin menggunakan sesi password yang berbeda. Setiap operasi harus dibatasi proyek di server; input `project` dari agen bukan bukti otorisasi.
 
+Untuk akun Google dan team, key baru dibuat dari `/user` untuk tepat satu workspace pribadi/team. Halaman tersebut menampilkan project slug workspace untuk argumen tool MCP. `get_context` tanpa project pada key pengguna memakai workspace key, bukan `global`; key lama tetap memakai default `global`. Anggota team dapat menggunakan key miliknya untuk memori team selama keanggotaannya aktif. Key lama (termasuk wildcard) tidak menjangkau namespace workspace `ws-`. Lihat [akun dan team](akun-team.md). Acceptance Google/team nyata masih pending dan tidak termasuk dalam skenario legacy di bawah.
+
 Panduan agen dapat dibaca melalui `get_memory_guide({})` atau resource `memona://guide`; lihat [discovery panduan](agent-guide.md). Setelah upgrade dan restart terdapat sepuluh tool.
 
 | Tool | Izin minimum | Tujuan |

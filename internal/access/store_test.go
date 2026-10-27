@@ -66,6 +66,9 @@ func TestKeysAndSessions(t *testing.T) {
 	if _, _, e = s.CreateKey(KeyInput{Name: "x", Permissions: []string{"read"}, Projects: []string{"../escape"}}); e == nil {
 		t.Fatal("bad scope accepted")
 	}
+	if _, _, e = s.CreateKey(KeyInput{Name: "x", Permissions: []string{"read"}, Projects: []string{"ws-legacy"}}); !errors.Is(e, ErrInvalid) {
+		t.Fatal("admin key accepted reserved workspace scope")
+	}
 	if _, _, e = s.CreateKey(KeyInput{Name: "x", Permissions: []string{"read"}, Projects: []string{"*"}, ExpiresAt: time.Now().Add(-time.Hour).Format(time.RFC3339)}); e == nil {
 		t.Fatal("past expiry accepted")
 	}

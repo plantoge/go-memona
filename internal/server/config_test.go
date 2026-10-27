@@ -32,6 +32,27 @@ func TestNetworkListenRequiresHTTPS(t *testing.T) {
 	}
 }
 
+func TestGoogleConfigRequiresPairAndSafeOrigin(t *testing.T) {
+	base := Config{Listen: "127.0.0.1:8765", PublicURL: "http://localhost:8765"}
+	base.GoogleClientID = "example"
+	if ValidateConfig(base) == nil {
+		t.Fatal("missing client secret accepted")
+	}
+	base.GoogleClientSecret = "synthetic"
+	if err := ValidateConfig(base); err != nil {
+		t.Fatalf("loopback development denied: %v", err)
+	}
+	base.PublicURL = "http://192.168.1.12:8765"
+	base.AllowPrivateHTTP = true
+	if ValidateConfig(base) == nil {
+		t.Fatal("private HTTP Google login accepted")
+	}
+	base = Config{Listen: "127.0.0.1:8765", PublicURL: "https://example.org", SecureCookies: true, GoogleClientID: "example", GoogleClientSecret: "synthetic"}
+	if err := ValidateConfig(base); err != nil {
+		t.Fatalf("HTTPS Google login denied: %v", err)
+	}
+}
+
 func TestNetworkOriginStillEnforcesHost(t *testing.T) {
 	f := setup(t)
 	app, e := New(Config{Listen: "0.0.0.0:8765", PublicURL: "https://memona.example.com", SecureCookies: true}, f.auth, f.notes)

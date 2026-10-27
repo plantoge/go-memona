@@ -19,7 +19,14 @@ func TestDashboardBuiltAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	files := []string{"/", "/index.html"}
+	user, err := fs.ReadFile(webui.Files, "user.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(user, []byte("/assets/")) {
+		t.Fatal("user page must reference built assets")
+	}
+	files := []string{"/", "/index.html", "/admin", "/admin/", "/user", "/user/", "/user.html"}
 	assetCount := 0
 	err = fs.WalkDir(webui.Files, "assets", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -41,8 +48,10 @@ func TestDashboardBuiltAssets(t *testing.T) {
 	for _, urlPath := range files {
 		t.Run(urlPath, func(t *testing.T) {
 			name := strings.TrimPrefix(urlPath, "/")
-			if name == "" {
+			if name == "" || name == "admin" || name == "admin/" {
 				name = "index.html"
+			} else if name == "user" || name == "user/" {
+				name = "user.html"
 			}
 			want, err := fs.ReadFile(webui.Files, name)
 			if err != nil {

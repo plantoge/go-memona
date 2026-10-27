@@ -34,6 +34,8 @@ type Key struct {
 	CreatedAt   string   `json:"created_at"`
 	ExpiresAt   string   `json:"expires_at"`
 	Revoked     bool     `json:"revoked"`
+	WorkspaceID string   `json:"workspace_id,omitempty"`
+	OwnerUserID string   `json:"owner_user_id,omitempty"`
 }
 type KeyInput struct {
 	Name        string   `json:"name"`
@@ -97,6 +99,12 @@ func Open(dir, password string) (*Store, error) {
 		return nil, err
 	}
 	if err := s.initProjects(); err != nil {
+		return nil, err
+	}
+	if err := s.initUsers(); err != nil {
+		return nil, err
+	}
+	if err := s.InitWorkspaces(); err != nil {
 		return nil, err
 	}
 	var count int
@@ -232,7 +240,7 @@ func (s *Store) CreateKeyContext(ctx context.Context, in KeyInput) (Key, string,
 		}
 	}
 	for _, p := range in.Projects {
-		if p != "*" && !slug.MatchString(p) {
+		if (p != "*" && !slug.MatchString(p)) || strings.HasPrefix(p, "ws-") {
 			return Key{}, "", ErrInvalid
 		}
 	}
@@ -329,6 +337,14 @@ func (k Key) Allows(permission, project string) bool {
 		}
 	}
 	if !permitted {
+		return false
+	}
+	// The workspace namespace is isolated from pre-existing admin keys,
+	// including wildcard keys created before user accounts existed.
+	if strings.HasPrefix(project, "ws-") {
+		return k.WorkspaceID != "" && len(k.Projects) == 1 && k.Projects[0] == project
+	}
+	if k.WorkspaceID != "" {
 		return false
 	}
 	for _, p := range k.Projects {

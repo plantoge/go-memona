@@ -12,14 +12,16 @@ import (
 	"memona/internal/webui"
 )
 
-// dashboardAsset serves only the built entry point and existing bundled assets.
+// dashboardAsset serves the explicit admin and user entry points and bundled assets.
 // It deliberately has no SPA fallback or access to the on-disk filesystem.
 func dashboardAsset(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimPrefix(r.URL.Path, "/")
-	if name == "" {
+	if name == "" || name == "admin" || name == "admin/" {
 		name = "index.html"
+	} else if name == "user" || name == "user/" {
+		name = "user.html"
 	}
-	if !fs.ValidPath(name) || (name != "index.html" && !strings.HasPrefix(name, "assets/")) {
+	if !fs.ValidPath(name) || (name != "index.html" && name != "user.html" && !strings.HasPrefix(name, "assets/")) {
 		assetNotFound(w, r)
 		return
 	}

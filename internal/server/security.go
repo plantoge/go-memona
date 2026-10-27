@@ -154,7 +154,7 @@ func (a *App) secureMCP(next http.Handler) http.Handler {
 		// the enclosing boundary's eight-slot cap remains held throughout.
 		k, err := func() (access.Key, error) {
 			defer func() { <-s.authSlots }()
-			return a.auth.AuthenticateContext(r.Context(), strings.TrimPrefix(h, "Bearer "))
+			return a.auth.AuthenticateWorkspaceKeyContext(r.Context(), strings.TrimPrefix(h, "Bearer "))
 		}()
 		if err != nil {
 			if errors.Is(err, access.ErrDenied) {
