@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import Icon from './lib/components/Icon.svelte';
+  import { applyTheme, type Theme } from './lib/theme';
   import { createAPI, array, errorMessage, isStale } from './lib/api';
   import { date, kindLabels, statusLabel, type Note } from './lib/types';
   import { splitWorkspaces, notePath, expiryValue, type Workspace, type Invitation, type UserKey } from './user-contract';
@@ -30,6 +32,11 @@
   let error = $state('');
   let message = $state('');
   let loadID = 0;
+  let theme = $state<Theme>(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+  let sidebarOpen = $state(true);
+  let compactLayout = $state(false);
+  let main = $state<HTMLElement>();
+  function toggleTheme() { theme = theme === 'dark' ? 'light' : 'dark'; applyTheme(theme); }
   const api = createAPI(() => { clearSession(); message = 'Sesi berakhir. Silakan masuk kembali.'; });
   const workspaces = $derived(personal ? [personal, ...teams] : teams);
   const current = $derived(workspaces.find(w => w.id === workspaceID));
@@ -51,7 +58,25 @@
       if (!isStale(e)) { clearSession(); if (e instanceof Error && !('status' in e && e.status === 401)) fail(e); }
     }
   }
-  onMount(() => { void initialize(); });
+  onMount(() => {
+    const layout = window.matchMedia('(max-width: 1024px)');
+    function updateLayout() {
+      if (compactLayout !== layout.matches) {
+        compactLayout = layout.matches;
+        sidebarOpen = !layout.matches;
+      }
+    }
+    updateLayout();
+    layout.addEventListener('change', updateLayout);
+    void initialize();
+    return () => { layout.removeEventListener('change', updateLayout); api.reset(); };
+  });
+  function closeMenuOnEscape(event: KeyboardEvent) {
+    if (event.key === 'Escape' && compactLayout && sidebarOpen) {
+      sidebarOpen = false;
+      document.querySelector<HTMLButtonElement>('.sidebar-toggle')?.focus();
+    }
+  }
 
   async function loadWorkspaces(preferred = workspaceID) {
     const result = array(await api.request<Workspace[] | null>('/api/user/workspaces'));
@@ -91,7 +116,10 @@
   function switchView(next: View) {
     if (token && next !== 'keys' && !confirm('Token baru akan disembunyikan. Sudah menyimpannya dengan aman?')) return;
     if (token && next !== 'keys') dismissToken();
-    view = next; message = ''; void loadView();
+    view = next; message = '';
+    if (compactLayout) sidebarOpen = false;
+    void tick().then(() => main?.focus());
+    void loadView();
   }
   async function action(task: () => Promise<void>) {
     if (busy) return;
@@ -183,43 +211,55 @@
 </script>
 
 <svelte:head><title>Memona — Ruang kerja saya</title></svelte:head>
-<div class="user-shell">
-  <header class="topbar">
-    <a class="brand" href="/user" aria-label="Memona, ruang kerja saya"><span class="mark" aria-hidden="true">M</span><span>Memona <small>Ruang kerja</small></span></a>
-    {#if session === 'in'}
-      <div class="account"><span class="account-name">{user?.name || user?.email}</span><button class="quiet" type="button" onclick={logout} disabled={busy}>Keluar</button></div>
-    {/if}
-  </header>
+<svelte:window onkeydown={closeMenuOnEscape} />
+<a class="skip-link" href="#main">Lewati ke konten</a>
+<div class="utility-controls">
+  <button type="button" class="icon-button" aria-label={theme === 'dark' ? 'Gunakan mode terang' : 'Gunakan mode gelap'} title={theme === 'dark' ? 'Mode terang' : 'Mode gelap'} onclick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
+  {#if session === 'in'}<button type="button" class="icon-button" aria-label="Muat ulang data" title="Muat ulang data" onclick={() => loadView()} disabled={loading || busy}><Icon name="refresh" /></button>{/if}
+</div>
+<div class="user-dashboard">
   {#if session === 'checking'}
-    <main class="center-state"><p role="status">Memeriksa sesi…</p></main>
+    <main id="main" class="center-state"><p role="status">Memeriksa sesi…</p></main>
   {:else if session === 'out'}
-    <main class="signin-card">
-      <p class="eyebrow">MEMONA · RUANG KERJA</p>
-      <h1>Memori untuk Anda dan tim.</h1>
-      <p>Masuk dengan akun Google untuk mengelola catatan, ruang kerja, dan kunci MCP Anda.</p>
-      {#if error}<p class="alert" role="alert">{error}</p>{/if}
+    <main id="main" class="login-wrap"><section class="login-card" aria-labelledby="login-title">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">m</span> memona<span class="brand-dot" aria-hidden="true">.</span></div>
+      <p class="eyebrow">RUANG KERJA / MEMONA</p>
+      <h1 id="login-title">Masuk</h1>
+      <p>Kelola memori pribadi dan tim dengan akun Google Anda.</p>
+      {#if error}<p class="inline-error" role="alert">{error}</p>{/if}
       {#if message}<p class="notice" role="status">{message}</p>{/if}
-      <a class="button primary" href="/auth/google/start">Masuk dengan Google</a>
-      <p class="hint">Jika muncul pesan “Login Google tidak tersedia”, Google sign-in belum diaktifkan. Hubungi administrator.</p>
+      <a class="user-primary-link primary full" href="/auth/google/start">Masuk dengan Google</a>
+      <p class="hint">Jika login Google belum tersedia, hubungi administrator.</p>
       <p class="hint">Administrator? <a href="/admin">Buka dashboard admin</a></p>
-    </main>
+    </section></main>
   {:else}
-    <div class="workspace-layout">
-      <aside class="sidebar" aria-label="Navigasi ruang kerja">
-        <label for="workspace">Ruang kerja</label>
-        <select id="workspace" value={workspaceID} onchange={changeWorkspace} disabled={busy}>
-          {#each workspaces as workspace (workspace.id)}<option value={workspace.id}>{workspace.name}{workspace.id === personal?.id ? ' · Pribadi' : ''}</option>{/each}
-        </select>
-        {#if current?.role}<p class="hint">Peran: {current.role}</p>{/if}
-        <nav aria-label="Bagian ruang kerja">
-          <button type="button" class:active={view === 'notes'} aria-current={view === 'notes' ? 'page' : undefined} onclick={() => switchView('notes')} disabled={busy}>Memori</button>
-          <button type="button" class:active={view === 'keys'} aria-current={view === 'keys' ? 'page' : undefined} onclick={() => switchView('keys')} disabled={busy}>Kunci MCP</button>
-          <button type="button" class:active={view === 'teams'} aria-current={view === 'teams' ? 'page' : undefined} onclick={() => switchView('teams')} disabled={busy}>Tim & undangan</button>
-        </nav>
-        <p class="sidebar-foot">Kunci dan memori hanya tersedia sesuai akses ruang kerja Anda.</p>
+    <div class="shell" class:sidebar-closed={!sidebarOpen} class:compact-layout={compactLayout}>
+      {#if compactLayout && sidebarOpen}<button type="button" class="sidebar-scrim" aria-label="Tutup menu navigasi" tabindex="-1" onclick={() => { sidebarOpen = false; }}></button>{/if}
+      <button type="button" class="sidebar-toggle" aria-expanded={sidebarOpen} aria-controls="sidebar-content" aria-label={compactLayout ? sidebarOpen ? 'Tutup menu navigasi' : 'Buka menu navigasi' : sidebarOpen ? 'Ciutkan menu navigasi' : 'Perluas menu navigasi'} title={sidebarOpen ? 'Tutup menu' : 'Buka menu'} onclick={() => { sidebarOpen = !sidebarOpen; }}>
+        <Icon name="panel" /><span class="toggle-label">{compactLayout ? sidebarOpen ? 'Tutup menu' : 'Menu' : 'Memona'}</span><span class="toggle-chevron"><Icon name="chevron" /></span>
+      </button>
+      <aside id="sidebar-content" class="sidebar" aria-label="Ruang kerja" aria-hidden={compactLayout && !sidebarOpen} inert={compactLayout && !sidebarOpen}>
+        <div class="sidebar-inner">
+          <div class="sidebar-brand"><span class="brand-mark" aria-hidden="true">m</span><span class="nav-text">memona</span></div>
+          <div class="workspace-picker"><label for="workspace">Ruang kerja</label>
+            <select id="workspace" value={workspaceID} onchange={changeWorkspace} disabled={busy}>
+              {#each workspaces as workspace (workspace.id)}<option value={workspace.id}>{workspace.name}{workspace.id === personal?.id ? ' · Pribadi' : ''}</option>{/each}
+            </select>
+            {#if current?.role}<p class="hint">Peran: {current.role}</p>{/if}
+          </div>
+          <nav aria-label="Navigasi utama" class={`active-${view}`}>
+            <span class="nav-indicator" aria-hidden="true"></span>
+            <button type="button" aria-label="Memori" title={!sidebarOpen ? 'Memori' : undefined} aria-current={view === 'notes' ? 'page' : undefined} onclick={() => switchView('notes')} disabled={busy}><Icon name="notes" /><span class="nav-text">Memori</span></button>
+            <button type="button" aria-label="Kunci MCP" title={!sidebarOpen ? 'Kunci MCP' : undefined} aria-current={view === 'keys' ? 'page' : undefined} onclick={() => switchView('keys')} disabled={busy}><Icon name="keys" /><span class="nav-text">Kunci MCP</span></button>
+            <button type="button" aria-label="Tim & undangan" title={!sidebarOpen ? 'Tim & undangan' : undefined} aria-current={view === 'teams' ? 'page' : undefined} onclick={() => switchView('teams')} disabled={busy}><Icon name="projects" /><span class="nav-text">Tim & undangan</span></button>
+          </nav>
+          <div class="sidebar-bottom"><p class="sidebar-account nav-text">{user?.name || user?.email}</p><button type="button" class="secondary sidebar-logout" aria-label="Keluar" title={!sidebarOpen ? 'Keluar' : undefined} disabled={busy} onclick={logout}><Icon name="logout" /><span class="nav-text">Keluar</span></button></div>
+        </div>
       </aside>
-      <main class="content" id="main-content">
-        <div class="page-heading"><div><p class="eyebrow">{current?.name || 'Ruang kerja'}</p><h1>{view === 'notes' ? 'Memori' : view === 'keys' ? 'Kunci MCP' : 'Tim & undangan'}</h1></div><button type="button" class="quiet" onclick={() => loadView()} disabled={loading || busy}>Muat ulang</button></div>
+      <main id="main" tabindex="-1" bind:this={main!} inert={compactLayout && sidebarOpen}>
+        <header class="workspace-heading"><span class="eyebrow">RUANG KERJA / {current?.name || 'MEMONA'}</span><h1>{view === 'notes' ? 'Memori' : view === 'keys' ? 'Kunci MCP' : 'Tim & undangan'}</h1>
+          {#if !sidebarOpen && !compactLayout}<div class="collapsed-workspace"><label for="workspace-collapsed">Ruang kerja</label><select id="workspace-collapsed" value={workspaceID} onchange={changeWorkspace} disabled={busy}>{#each workspaces as workspace (workspace.id)}<option value={workspace.id}>{workspace.name}{workspace.id === personal?.id ? ' · Pribadi' : ''}</option>{/each}</select></div>{/if}
+        </header>
         {#if error}<p class="alert" role="alert">{error}</p>{/if}
         {#if message}<p class="notice" role="status">{message}</p>{/if}
         {#if loading}<p role="status">Memuat data…</p>{/if}
@@ -233,10 +273,10 @@
               <label>Status<select bind:value={editor.status}>{#if editor.kind === 'skill'}<option value="draft">Draf</option>{:else}<option value="unverified">Belum diverifikasi</option><option value="verified">Terverifikasi</option>{/if}</select></label>
               <label>Sumber<input required bind:value={editor.source} placeholder="Asal informasi"></label>
               <label class="wide">Isi<textarea required rows="10" bind:value={editor.content}></textarea></label>
-              <div class="form-actions"><button type="button" class="quiet" onclick={() => editing = false} disabled={busy}>Batal</button><button class="button primary" disabled={busy} type="submit">{busy ? 'Menyimpan…' : 'Simpan memori'}</button></div>
+              <div class="form-actions"><button type="button" class="secondary" onclick={() => editing = false} disabled={busy}>Batal</button><button class="primary" disabled={busy} type="submit">{busy ? 'Menyimpan…' : 'Simpan memori'}</button></div>
             </form>
           {:else if selected}
-            <article class="panel note-detail"><div class="section-head"><div><p class="eyebrow">{kindLabels[selected.kind] || selected.kind} · Revisi {selected.revision}</p><h2>{selected.title}</h2></div><button type="button" class="quiet" onclick={() => selected = null}>Tutup</button></div><p class="hint">{statusLabel(selected.status)} · {date(selected.updated_at)} · Sumber: {selected.source}</p><pre class="note-body">{selected.content}</pre><button class="button" type="button" onclick={() => { if (selected) startNote(selected); }} disabled={busy}>Sunting</button></article>
+            <article class="panel note-detail"><div class="section-head"><div><p class="eyebrow">{kindLabels[selected.kind] || selected.kind} · Revisi {selected.revision}</p><h2>{selected.title}</h2></div><button type="button" class="secondary" onclick={() => selected = null}>Tutup</button></div><p class="hint">{statusLabel(selected.status)} · {date(selected.updated_at)} · Sumber: {selected.source}</p><pre class="note-body">{selected.content}</pre><button class="secondary" type="button" onclick={() => { if (selected) startNote(selected); }} disabled={busy}>Sunting</button></article>
           {/if}
           {#if !loading && notes.length === 0}<p class="empty">Belum ada memori di ruang kerja ini.</p>{/if}
           <ul class="item-list">{#each notes as note (note.id)}<li><button type="button" class="item-button" onclick={() => openNote(note)}><strong>{note.title}</strong><span>{kindLabels[note.kind] || note.kind} · {statusLabel(note.status)} · {date(note.updated_at)}</span></button></li>{/each}</ul>

@@ -1,0 +1,67 @@
+/* User workspace uses the same shell and tokens as the admin dashboard. */
+.user-dashboard .center-state { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+.user-dashboard .login-wrap { margin: 0; max-width: none; }
+.user-dashboard .login-card > p:not(.eyebrow):not(.hint):not(.inline-error):not(.notice) { color: var(--muted); }
+.user-primary-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 10px; padding: 10px 15px; font-weight: 600; text-decoration: none; }
+.user-primary-link:hover { background: var(--accent-hover); }
+.user-dashboard .workspace-picker { padding: 0 10px; margin-bottom: 22px; min-width: 0; }
+.user-dashboard .workspace-picker label { color: var(--muted); }
+.user-dashboard .workspace-picker select { font-size: .85rem; }
+.user-dashboard .workspace-picker .hint { margin-bottom: 0; overflow-wrap: anywhere; }
+.user-dashboard .sidebar-closed:not(.compact-layout) .workspace-picker { display: none; }
+.user-dashboard .collapsed-workspace { max-width: 300px; margin-top: 16px; }
+.user-dashboard .active-keys .nav-indicator { transform: translateY(56px); }
+.user-dashboard .active-teams .nav-indicator { transform: translateY(112px); }
+.user-dashboard .sidebar-account { color: var(--muted); font-size: .78rem; padding: 0 12px; overflow-wrap: anywhere; }
+.user-dashboard .workspace-heading .eyebrow { overflow-wrap: anywhere; }
+.user-dashboard .notice { padding: 12px 14px; background: var(--pale); border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.user-dashboard .alert { color: var(--danger); padding: 12px 14px; background: var(--danger-bg); border: 1px solid var(--danger-line); border-radius: 10px; overflow-wrap: anywhere; }
+.user-dashboard .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.user-dashboard .section-head h2, .user-dashboard .section-head h3 { margin: 0; }
+.user-dashboard .form-grid { margin-bottom: 24px; }
+.user-dashboard .form-grid > h2, .user-dashboard .form-grid > h3, .user-dashboard .form-grid > .wide, .user-dashboard .form-grid > .form-actions { grid-column: 1 / -1; }
+.user-dashboard .form-grid label { display: block; min-width: 0; }
+.user-dashboard .form-grid label input, .user-dashboard .form-grid label select, .user-dashboard .form-grid label textarea { margin-top: 7px; }
+.user-dashboard .form-grid fieldset { margin: 0; }
+.user-dashboard .form-grid .check { display: inline-flex; align-items: center; gap: 9px; margin-right: 20px; min-height: 44px; font-weight: 400; }
+.user-dashboard .form-grid .check input { width: 19px; margin: 0; }
+.user-dashboard .form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.user-dashboard .item-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; list-style: none; padding: 0; margin: 0 0 28px; }
+.user-dashboard .item-list li { min-width: 0; background: var(--glass-soft); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 20px; overflow-wrap: anywhere; }
+.user-dashboard .item-list li:focus-within { border-color: var(--accent); }
+.user-dashboard .item-list .item-button { width: 100%; display: grid; gap: 12px; align-content: start; padding: 0; min-height: 44px; justify-content: stretch; text-align: left; background: transparent; border: 0; }
+.user-dashboard .item-list .item-button:hover strong { color: var(--accent); }
+.user-dashboard .item-list strong { font-size: 1rem; }
+.user-dashboard .item-list span { display: block; color: var(--muted); font-size: .8rem; }
+.user-dashboard .item-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.user-dashboard .item-row > div { min-width: 0; display: grid; gap: 8px; }
+.user-dashboard .item-row > button { flex-shrink: 0; }
+.user-dashboard .empty { color: var(--muted); border: 1px dashed var(--input-line); border-radius: 12px; padding: 28px 20px; text-align: center; }
+.user-dashboard .two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+.user-dashboard .two-columns .form-grid { display: grid; grid-template-columns: 1fr; margin: 0; }
+.user-dashboard .note-detail { margin-bottom: 24px; }
+.user-dashboard .note-detail .hint { margin: 16px 0; }
+.user-dashboard .note-body { background: var(--code); border-radius: 8px; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; font-size: .85rem; }
+.user-dashboard .lead { color: var(--muted); }
+.user-dashboard code { background: var(--code); border-radius: 6px; padding: 2px 6px; overflow-wrap: anywhere; }
+.user-dashboard .token-panel { margin-bottom: 24px; background: var(--pale); }
+.user-dashboard .token-panel code { display: block; padding: 12px; margin-bottom: 16px; user-select: all; word-break: break-all; }
+.user-dashboard .token-panel button { background: var(--glass); border: 1px solid var(--line); }
+.user-dashboard .token-panel button:hover { background: var(--surface); }
+.user-dashboard .login-card .hint { text-align: left; }
+.user-dashboard .item-row > .button { background: var(--glass); border-color: var(--line); }
+.user-dashboard .item-row > .button:hover { background: var(--pale); }
+.user-dashboard .item-row > .danger { background: var(--danger-bg); border-color: var(--danger-line); color: var(--danger); }
+.user-dashboard .item-row > .danger:hover { border-color: var(--danger); }
+@media (min-width: 1550px) { .user-dashboard .item-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1024px) {
+  .user-dashboard .compact-layout.sidebar-closed .workspace-picker { display: block; }
+  .user-dashboard .compact-layout.sidebar-closed .sidebar-brand .nav-text,
+  .user-dashboard .compact-layout.sidebar-closed .sidebar nav .nav-text,
+  .user-dashboard .compact-layout.sidebar-closed .sidebar-bottom .nav-text { display: inline; }
+}
+@media (max-width: 700px) {
+  .user-dashboard .item-list, .user-dashboard .two-columns { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .user-dashboard .item-list li { padding: 16px; }
+  .user-dashboard .section-head, .user-dashboard .item-row { flex-wrap: wrap; }
+}
