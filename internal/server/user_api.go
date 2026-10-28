@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"memona/internal/access"
@@ -133,6 +134,48 @@ func (a *App) userAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		a.audit("user:"+user.ID, "key.revoke", id)
 		respond(w, 200, map[string]bool{"ok": true})
+	case path == "graph" && r.Method == "GET":
+		workspaceID := r.URL.Query().Get("workspace_id")
+		ws, err := a.auth.UserWorkspace(r.Context(), user.ID, workspaceID)
+		if err != nil {
+			a.userAccessError(w, err)
+			return
+		}
+		limit := 200
+		if raw := r.URL.Query().Get("limit"); raw != "" {
+			limit, err = strconv.Atoi(raw)
+			if err != nil || limit < 1 || limit > 500 {
+				fail(w, 400, "Batas graph harus 1–500.")
+				return
+			}
+		}
+		query := r.URL.Query().Get("q")
+		if len(query) > 2000 {
+			fail(w, 400, "Filter graph terlalu panjang.")
+			return
+		}
+		// Never accept a caller-supplied project or archive flag for user graphs.
+		if r.URL.Query().Has("project") || r.URL.Query().Has("archived") {
+			fail(w, 400, "Filter graph tidak valid.")
+			return
+		}
+		all, err := a.notes.ListContext(r.Context())
+		if err != nil {
+			a.internal(w, err)
+			return
+		}
+		authorized := make([]memory.Note, 0)
+		for _, n := range all {
+			if n.Project == ws.Project && !n.Archived {
+				authorized = append(authorized, n)
+			}
+		}
+		out, err := buildGraph(r.Context(), authorized, ws.Project, query, false, limit)
+		if err != nil {
+			a.internal(w, err)
+			return
+		}
+		respond(w, 200, out)
 	case path == "notes" && r.Method == "GET":
 		workspaceID := r.URL.Query().Get("workspace_id")
 		ws, err := a.auth.UserWorkspace(r.Context(), user.ID, workspaceID)
@@ -158,12 +201,13 @@ func (a *App) userAPI(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, out)
 	case path == "notes" && r.Method == "POST":
 		var in struct {
-			WorkspaceID string `json:"workspace_id"`
-			Kind        string `json:"kind"`
-			Title       string `json:"title"`
-			Content     string `json:"content"`
-			Status      string `json:"status"`
-			Source      string `json:"source"`
+			WorkspaceID    string                 `json:"workspace_id"`
+			Kind           string                 `json:"kind"`
+			Title          string                 `json:"title"`
+			Content        string                 `json:"content"`
+			Status         string                 `json:"status"`
+			Source         string                 `json:"source"`
+			CodeReferences []memory.CodeReference `json:"code_references"`
 		}
 		if decode(r, &in) != nil {
 			fail(w, 400, "Catatan tidak valid.")
@@ -174,7 +218,7 @@ func (a *App) userAPI(w http.ResponseWriter, r *http.Request) {
 			a.userAccessError(w, err)
 			return
 		}
-		n, err := a.notes.CreateContext(r.Context(), memory.Input{Project: ws.Project, Kind: in.Kind, Title: in.Title, Content: in.Content, Status: in.Status, Source: in.Source}, "user:"+user.ID)
+		n, err := a.notes.CreateContext(r.Context(), memory.Input{Project: ws.Project, Kind: in.Kind, Title: in.Title, Content: in.Content, Status: in.Status, Source: in.Source, CodeReferences: in.CodeReferences}, "user:"+user.ID)
 		if err != nil {
 			a.noteError(w, err)
 			return
@@ -219,12 +263,13 @@ func (a *App) userAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var in struct {
-			ExpectedRevision int    `json:"expected_revision"`
-			Kind             string `json:"kind"`
-			Title            string `json:"title"`
-			Content          string `json:"content"`
-			Status           string `json:"status"`
-			Source           string `json:"source"`
+			ExpectedRevision int                    `json:"expected_revision"`
+			Kind             string                 `json:"kind"`
+			Title            string                 `json:"title"`
+			Content          string                 `json:"content"`
+			Status           string                 `json:"status"`
+			Source           string                 `json:"source"`
+			CodeReferences   []memory.CodeReference `json:"code_references"`
 		}
 		if decode(r, &in) != nil {
 			fail(w, 400, "Catatan tidak valid.")
@@ -234,7 +279,7 @@ func (a *App) userAPI(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, "Jenis catatan tidak dapat diubah.")
 			return
 		}
-		updated, err := a.notes.ReviseContext(r.Context(), id, in.ExpectedRevision, memory.Input{Project: ws.Project, Kind: n.Kind, Title: in.Title, Content: in.Content, Status: in.Status, Source: in.Source}, "user:"+user.ID)
+		updated, err := a.notes.ReviseContext(r.Context(), id, in.ExpectedRevision, memory.Input{Project: ws.Project, Kind: n.Kind, Title: in.Title, Content: in.Content, Status: in.Status, Source: in.Source, CodeReferences: in.CodeReferences}, "user:"+user.ID)
 		if err != nil {
 			a.noteError(w, err)
 			return

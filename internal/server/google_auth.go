@@ -166,7 +166,7 @@ func (a *App) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: userCookie, Value: token, Path: "/", HttpOnly: true, Secure: a.cfg.SecureCookies || a.tunnelHost != "", SameSite: http.SameSiteLaxMode, MaxAge: 8 * 60 * 60})
 	a.audit("user:"+user.ID, "login", "")
-	http.Redirect(w, r, "/user", http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (a *App) userSession(w http.ResponseWriter, r *http.Request) {

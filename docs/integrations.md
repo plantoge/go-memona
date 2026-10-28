@@ -4,9 +4,9 @@
 
 Endpoint MCP: `/mcp`, transport HTTP dengan `Authorization: Bearer …`. Browser admin menggunakan sesi password yang berbeda. Setiap operasi harus dibatasi proyek di server; input `project` dari agen bukan bukti otorisasi.
 
-Untuk akun Google dan team, key baru dibuat dari `/user` untuk tepat satu workspace pribadi/team. Halaman tersebut menampilkan project slug workspace untuk argumen tool MCP. `get_context` tanpa project pada key pengguna memakai workspace key, bukan `global`; key lama tetap memakai default `global`. Anggota team dapat menggunakan key miliknya untuk memori team selama keanggotaannya aktif. Key lama (termasuk wildcard) tidak menjangkau namespace workspace `ws-`. Lihat [akun dan team](akun-team.md). Acceptance Google/team nyata masih pending dan tidak termasuk dalam skenario legacy di bawah.
+Untuk akun Google dan team, key baru dibuat dari `/` untuk tepat satu workspace pribadi/team. Halaman tersebut menampilkan project slug workspace untuk argumen tool MCP. `get_context` tanpa project pada key pengguna memakai workspace key, bukan `global`; key lama tetap memakai default `global`. Anggota team dapat menggunakan key miliknya untuk memori team selama keanggotaannya aktif. Key lama (termasuk wildcard) tidak menjangkau namespace workspace `ws-`. Lihat [akun dan team](akun-team.md). Acceptance Google/team nyata masih pending dan tidak termasuk dalam skenario legacy di bawah.
 
-Panduan agen dapat dibaca melalui `get_memory_guide({})` atau resource `memona://guide`; lihat [discovery panduan](agent-guide.md). Setelah upgrade dan restart terdapat sepuluh tool.
+Panduan agen dapat dibaca melalui `get_memory_guide({})` atau resource `memona://guide`; lihat [discovery panduan](agent-guide.md). Untuk bukti kode, integrasi Codebase Memory dan indeks Go opsional, lihat [panduan repository](kode-repository.md). Cocokkan tool yang tersedia dengan discovery `tools/list` build yang berjalan; `search_code_index` tersedia meski allowlist repo kosong dan dalam keadaan itu hasilnya kosong.
 
 | Tool | Izin minimum | Tujuan |
 | --- | --- | --- |
@@ -21,6 +21,7 @@ Panduan agen dapat dibaca melalui `get_memory_guide({})` atau resource `memona:/
 | `archive_memory` | `archive` | Mengarsipkan, bukan hard delete; konflik versi diperiksa |
 | `get_skill` | `read` | Mengambil objek catatan skill berstatus `active`, nonarsip, berdasarkan ID |
 | `find_duplicate_candidates` | `read` | Maksimal sepuluh metadata kandidat leksikal satu proyek eksplisit; tanpa merge/write |
+| `search_code_index` | `read` pada `project` eksplisit | Cari metadata simbol Go dari allowlist repo lokal yang dipetakan ke project; snapshot startup, tanpa isi source |
 
 ### Argumen sesuai source saat ini
 
@@ -35,6 +36,7 @@ Skema SDK diturunkan dari struct di `internal/server/mcp.go` dan `memory.Input`.
 | `revise_memory` | `id`, `expected_revision`, dan keenam field `memory.Input` di atas | Penggantian lengkap, bukan patch parsial; memeriksa scope proyek asal dan tujuan. |
 | `archive_memory` | `id`, `expected_revision` | Tidak menerima isi pengganti. |
 | `find_duplicate_candidates` | `project`, `title`, `content` | `exclude_id` opsional; proyek eksplisit wajib berizin read, maksimum sepuluh metadata nonarsip, bukan probabilitas duplicate. |
+| `search_code_index` | `project`, `query` | `repository` opsional adalah nama konfigurasi; `limit` default 20, maksimum 50. Tidak menerima path filesystem dari agen. |
 
 Keenam field inti `memory.Input` wajib hadir pada skema meskipun `source` boleh berupa string kosong untuk status selain `verified`; `content` juga boleh kosong. `project` harus cocok `^[a-z0-9][a-z0-9-]{0,63}$`, judul wajib tidak kosong (maksimum 200 byte), konten maksimum 64 KiB, dan sumber maksimum 2.000 byte. Jenis storage: `fact`, `decision`, `knowledge`, `handoff`, `skill`. Status input: `unverified`, `verified`, atau `draft`; `verified` memerlukan sumber tidak kosong. Skill baru wajib `draft`. Status `active` hanya hasil publish admin; revisi skill aktif kembali draft.
 
@@ -54,7 +56,7 @@ Empat mutation tool `save_memory`/`save_handoff`/`revise_memory`/`archive_memory
 
 Setelah upgrade relasi, respons memiliki metadata dan `connections` yang belum ada pada kontrak lama. Bila harness melaporkan `Structured content does not match the tool's output schema` atau `additional properties`, bandingkan discovery `tools/list` dari endpoint/build yang benar dengan skema yang dikenali harness. Katalog delapan tool tanpa `get_memory_relations`/`get_memory_guide` dapat menunjukkan kontrak lama, bukan bukti pasti bug server. Reconnect MCP atau mulai sesi baru sesuai mekanisme harness untuk memperbarui discovery; jangan menonaktifkan validasi atau mengubah data/secret untuk menyiasatinya. Pastikan dulu binary yang dimaksud sudah diaktifkan dengan persetujuan; reconnect saja tidak mengganti binary server.
 
-`TestMCPDiscoveredOutputSchemas` memvalidasi structured output sebelas tool terhadap skema runtime `tools/list`, termasuk hasil kosong, metadata, hubungan dan mutasi sintetis. Test lokal ini lulus, tetapi bukan bukti bahwa cache/koneksi OpenCode atau Hermes pengguna telah diperbarui. Reconnect/acceptance nyata tetap dicatat terpisah.
+`TestMCPDiscoveredOutputSchemas` memvalidasi structured output dua belas tool terhadap skema runtime `tools/list`, termasuk hasil kosong, metadata, hubungan, hasil indeks kode kosong dan mutasi sintetis. Test lokal ini lulus, tetapi bukan bukti bahwa cache/koneksi OpenCode atau Hermes pengguna telah diperbarui. Reconnect/acceptance nyata tetap dicatat terpisah.
 
 Contoh **arguments** untuk `save_memory` (bukan envelope JSON-RPC):
 
@@ -80,7 +82,7 @@ Semua langkah di bawah **manual pending** sampai ada bukti aktual. Gunakan data 
 1. Catat tanggal, versi Go, versi aplikasi/commit/hash binary, versi OpenCode V2 dan Hermes, OS, URL, serta konfigurasi nonsecret. Jalankan `make test`, `make race`, `make vet`, `make build`; simpan exit code dan hasil yang telah disunting dari secret.
 2. Siapkan konfigurasi/data baru yang terisolasi dan disetujui. Uji bootstrap tanpa password dan dengan password kurang dari 10 byte: startup harus gagal. Masukkan password valid lewat prompt tersembunyi dan jalankan `memona serve` sesuai README.
 3. Login UI; gunakan proyek sintetis `acceptance-demo` dan `acceptance-other`. Buat key berbeda untuk OpenCode dan Hermes, scope hanya `acceptance-demo`, izin `read`, `write`, `archive`. Buat juga key read-only untuk uji negatif. Tidak perlu scope `*` untuk skenario ini.
-4. Gabungkan snippet integrasi pada konfigurasi/profil yang benar, tanpa menghapus konfigurasi lain. Pastikan dua harness melakukan discovery pada `/mcp` dan menemukan sepuluh tool di atas. Catat nama wrapper aktual dan skema, tanpa key.
+4. Gabungkan snippet integrasi pada konfigurasi/profil yang benar, tanpa menghapus konfigurasi lain. Pastikan dua harness melakukan discovery pada `/mcp` dan mencocokkan tool dengan build yang diuji (dua belas pada source ini, termasuk `search_code_index`). Catat nama wrapper aktual dan skema, tanpa key.
 5. Gunakan penanda sintetis unik, misalnya `MEMONA-ACCEPT-<tanggal>-<run-id>`, agar hasil tidak tertukar dengan percobaan sebelumnya. Jangan membersihkan data uji dengan hard delete; arsipkan sesuai izin bila selesai.
 
 ## Skenario inti: OpenCode → UI → Hermes → OpenCode

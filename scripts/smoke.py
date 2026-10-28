@@ -21,7 +21,11 @@ with socket.socket() as sock:
     port = sock.getsockname()[1]
 origin = f"http://127.0.0.1:{port}"
 config = work / "config.json"
-config.write_text(json.dumps({"listen": f"127.0.0.1:{port}", "data_dir": str(work / "data"), "public_url": origin, "secure_cookies": False}))
+repo = work / "synthetic-repo"
+repo.mkdir()
+(repo / "sample.go").write_text("package smoke\nfunc EvidenceSymbol() { Helper() }\nfunc Helper() {}\n")
+config.write_text(json.dumps({"listen": f"127.0.0.1:{port}", "data_dir": str(work / "data"), "public_url": origin, "secure_cookies": False,
+                              "code_repositories": [{"name": "synthetic", "project": "smoke-test", "path": str(repo)}]}))
 password = secrets.token_urlsafe(32)
 env = os.environ.copy()
 env["MEMONA_ADMIN_PASSWORD"] = password
@@ -74,12 +78,23 @@ try:
             assert response.status == 200 and len(response.read()) > 0
         with urllib.request.urlopen(urllib.request.Request(origin + asset, method="HEAD")) as response:
             assert response.read() == b"", "HEAD returned body"
-    # Exercise the lazy graph asset URL as an embedded static file, not as a
-    # browser/WebGL acceptance claim. The current index references this import.
-    entry_js = next(asset for asset in assets if asset.endswith('.js'))
+    # The graph is loaded from the admin entry point, not the user home.
+    with urllib.request.urlopen(origin + "/admin") as response:
+        admin_page = response.read().decode()
+    admin_assets = re.findall(r'(?:src|href)="(/assets/[^\"]+)"', admin_page)
+    entry_js = next(asset for asset in admin_assets if asset.endswith('.js'))
     with urllib.request.urlopen(origin + entry_js) as response:
         entry_source = response.read().decode()
     graph_assets = set(re.findall(r'three-graph-renderer-[A-Za-z0-9_-]+\.js', entry_source))
+    # Vite may place the dynamic import in the graph component chunk rather
+    # than directly in the admin entry. Only inspect files linked in the
+    # embedded admin build, never arbitrary server paths.
+    if not graph_assets:
+        for name in (asset.rsplit('/', 1)[-1] for asset in admin_assets if asset.endswith('.js')):
+            if name == entry_js.rsplit('/', 1)[-1]:
+                continue
+            with urllib.request.urlopen(origin + '/assets/' + name) as response:
+                graph_assets.update(re.findall(r'three-graph-renderer-[A-Za-z0-9_-]+\.js', response.read().decode()))
     assert graph_assets, 'lazy graph chunk reference missing'
     for asset in graph_assets:
         with urllib.request.urlopen(origin + '/assets/' + asset) as response:
@@ -106,7 +121,7 @@ try:
     initialized = rpc(token, "initialize", {"protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "1"}})
     assert "result" in initialized, "MCP initialize failed"
     tools = rpc(token, "tools/list", {})["result"]["tools"]
-    assert len(tools) == 11, "unexpected tools"
+    assert len(tools) == 12 and any(tool["name"] == "search_code_index" for tool in tools), "unexpected tools"
     for tool in tools:
         if tool["name"] in ("save_memory", "save_handoff", "revise_memory", "archive_memory"):
             assert "operation_id" in tool["inputSchema"]["properties"]
@@ -119,6 +134,21 @@ try:
             output = json.loads(result["content"][0]["text"])
             assert "_operation" not in json.dumps(output), "internal receipt leaked"
             return output
+
+    code = mutation("search_code_index", {"project": "smoke-test", "query": "EvidenceSymbol"})
+    assert len(code["items"]) == 1 and code["items"][0]["reference"] == "synthetic:sample.go#L2-L2"
+    assert code["items"][0]["calls"] == ["Helper"] and str(repo) not in json.dumps(code)
+    restricted = request("/api/keys", {"name": "other-project", "permissions": ["read"], "projects": ["other-project"]}, csrf)["token"]
+    denied = rpc(restricted, "tools/call", {"name": "search_code_index", "arguments": {"project": "smoke-test", "query": "EvidenceSymbol"}})["result"]
+    assert denied.get("isError") and "EvidenceSymbol" not in json.dumps(denied)
+    unrelated = rpc(restricted, "tools/call", {"name": "search_code_index", "arguments": {"project": "other-project", "query": "EvidenceSymbol"}})["result"]
+    assert not unrelated.get("isError") and not json.loads(unrelated["content"][0]["text"])["items"]
+    ref = {"repository": "synthetic", "path": "sample.go", "symbol": "EvidenceSymbol", "line": 2}
+    cited = mutation("save_memory", {"project": "smoke-test", "kind": "decision", "title": "Code citation", "content": "Synthetic rationale.", "status": "unverified", "source": "synthetic fixture", "code_references": [ref]})
+    assert mutation("read_memory", {"id": cited["id"]})["code_references"] == [ref]
+    assert mutation("revise_memory", {"id": cited["id"], "expected_revision": 1, "project": "smoke-test", "kind": "decision", "title": "Code citation", "content": "Reviewed rationale.", "status": "unverified", "source": "synthetic fixture"})["code_references"] == [ref]
+    (repo / "sample.go").write_text("package smoke\nfunc NewSymbol() {}\n")
+    assert len(mutation("search_code_index", {"project": "smoke-test", "query": "EvidenceSymbol"})["items"]) == 1, "snapshot changed without restart"
 
     retry_args = {"project": "smoke-test", "kind": "fact", "title": "Retry fixture", "content": "Synthetic retry.", "status": "unverified", "source": "", "operation_id": "smoke-retry-001", "is_testing": True}
     retry_note = mutation("save_memory", retry_args)
@@ -161,6 +191,9 @@ try:
     process = start()
     session = request("/api/login", {"password": password})
     csrf = {"X-CSRF-Token": session["csrf"]}
+    assert not mutation("search_code_index", {"project": "smoke-test", "query": "EvidenceSymbol"})["items"]
+    assert len(mutation("search_code_index", {"project": "smoke-test", "query": "NewSymbol"})["items"]) == 1
+    assert mutation("read_memory", {"id": cited["id"]})["code_references"] == [ref]
     assert request("/api/notes/" + note["id"])["note"]["revision"] == 1
     assert request("/api/notes/" + note["id"])["note"]["needs_review"] is True
     persisted = request("/api/notes/" + overview["id"])["note"]
@@ -192,7 +225,7 @@ try:
     health = request("/api/storage-health")
     assert health["integrity"]["complete"] and not health["integrity"]["issues"]
     assert health["disk"]["available"] and health["write_failures_observed"]
-    assert health["integrity"]["notes"] == 4
+    assert health["integrity"]["notes"] == 5
     after_health = snapshot()
     changed_health = sorted(name for name in set(before) | set(after_health) if before.get(name) != after_health.get(name))
     # Session authentication reads SQLite: its SHM reader coordination bytes can
@@ -224,7 +257,7 @@ try:
     health = json.loads(offline.stdout)
     assert health["integrity"]["issues"]["corrupt_revision"] == 1 and not health["write_failures_observed"]
     assert "PRIVATE" not in offline.stdout.decode() and snapshot() == before
-    print("PASS: embedded Svelte assets/CSP/HEAD/private paths, binary startup, admin login, UI key API, MCP initialize/tools/save, summary priority/supersedes/backlinks/admin metadata, operation_id discovery/retry/conflict/handoff/revise/restart persistence, revocation, admin health/read-only snapshot, offline inspect writer refusal/corruption/exit2/staging retained, minimal public liveness.")
+    print("PASS: embedded Svelte assets/CSP/HEAD/private paths, binary startup, admin login, UI key API, MCP initialize/tools/save, synthetic Go index/project isolation/snapshot restart, code citations persistence, summary priority/supersedes/backlinks/admin metadata, operation_id discovery/retry/conflict/handoff/revise/restart persistence, revocation, admin health/read-only snapshot, offline inspect writer refusal/corruption/exit2/staging retained, minimal public liveness.")
     print("Retained synthetic fixture directory:", work)
 finally:
     if process is not None and process.poll() is None:

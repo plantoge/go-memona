@@ -128,6 +128,7 @@ func TestUserTeamWorkspaceIsolationAndMCP(t *testing.T) {
 	}
 	teamNote := workspaceNote(t, f, alice, team.ID, "Team shared")
 	workspaceRequest(t, f, bob, "GET", "/api/user/notes?workspace_id="+team.ID, "", 403)
+	workspaceRequest(t, f, bob, "GET", "/api/user/graph?workspace_id="+team.ID, "", 403)
 	workspaceRequest(t, f, bob, "POST", "/api/user/teams/"+team.ID+"/invite", `{"email":"charlie@example.test"}`, 403)
 	invitePath := "/api/user/teams/" + team.ID + "/invite"
 	if w := request(f.app, "POST", invitePath, `{"email":"bob@example.test"}`, alice.cookie, ""); w.Code != 403 {
@@ -154,11 +155,15 @@ func TestUserTeamWorkspaceIsolationAndMCP(t *testing.T) {
 	if notes := workspaceJSON[[]memory.Note](t, workspaceRequest(t, f, bob, "GET", "/api/user/notes?workspace_id="+team.ID, "", 200)); len(notes) != 1 || notes[0].ID != teamNote.ID {
 		t.Fatalf("shared team note missing: %#v", notes)
 	}
+	if graph := workspaceJSON[graphResult](t, workspaceRequest(t, f, bob, "GET", "/api/user/graph?workspace_id="+team.ID, "", 200)); len(graph.Nodes) != 1 || graph.Nodes[0].ID != teamNote.ID {
+		t.Fatalf("shared team graph missing: %#v", graph)
+	}
 	memberNote := workspaceNote(t, f, bob, team.ID, "Member contribution")
 	if n := workspaceJSON[memory.Note](t, workspaceRequest(t, f, alice, "GET", "/api/user/notes/"+memberNote.ID+"?workspace_id="+team.ID, "", 200)); n.ID != memberNote.ID || n.Project != team.Project {
 		t.Fatalf("team owner cannot read member contribution: %#v", n)
 	}
 	workspaceRequest(t, f, charlie, "GET", "/api/user/notes?workspace_id="+team.ID, "", 403)
+	workspaceRequest(t, f, charlie, "GET", "/api/user/graph?workspace_id="+team.ID, "", 403)
 	workspaceRequest(t, f, charlie, "GET", "/api/user/notes/"+teamNote.ID+"?workspace_id="+team.ID, "", 404)
 
 	keyBody := `{"workspace_id":"` + team.ID + `","name":"no csrf","permissions":["read","write"]}`

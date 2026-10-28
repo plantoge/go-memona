@@ -91,8 +91,8 @@ func TestMCPDiscoveredOutputSchemas(t *testing.T) {
 		}
 		schemas[tool.Name] = resolved
 	}
-	if len(schemas) != 11 {
-		t.Fatalf("expected eleven discovered output schemas, got %d", len(schemas))
+	if len(schemas) != 12 {
+		t.Fatalf("expected twelve discovered output schemas, got %d", len(schemas))
 	}
 	validated := map[string]bool{}
 	// This schema suite deliberately makes more calls than the production
@@ -136,6 +136,7 @@ func TestMCPDiscoveredOutputSchemas(t *testing.T) {
 		return result
 	}
 	check("get_memory_guide", map[string]any{})
+	check("search_code_index", map[string]any{"project": "demo", "query": "sample"})
 	check("get_context", map[string]any{"project": "demo"})
 	check("get_context", map[string]any{"project": "demo", "kind": "not-found"})
 	check("search_memory", map[string]any{"project": "demo"})
@@ -162,12 +163,12 @@ func TestMCPDiscoveredOutputSchemas(t *testing.T) {
 	if err := json.Unmarshal([]byte(resultText(t, cleared)), &clearedNote); err != nil || clearedNote.SkillMetadata != nil {
 		t.Fatal("clear failed", err)
 	}
-	args := map[string]any{"project": "demo", "kind": "fact", "title": "Schema round trip", "content": "Synthetic fixture", "status": "unverified", "source": "", "related_to": []string{target.ID}, "is_testing": true, "operation_id": "schema-operation-001"}
+	args := map[string]any{"project": "demo", "kind": "fact", "title": "Schema round trip", "content": "Synthetic fixture", "status": "unverified", "source": "", "related_to": []string{target.ID}, "code_references": []map[string]any{{"repository": "fixture", "path": "main.go", "symbol": "Run", "line": 3}}, "is_testing": true, "operation_id": "schema-operation-001"}
 	created := check("save_memory", args)
 	check("save_memory", args)
 	var n memory.Note
-	if err := json.Unmarshal([]byte(resultText(t, created)), &n); err != nil {
-		t.Fatal(err)
+	if err := json.Unmarshal([]byte(resultText(t, created)), &n); err != nil || len(n.CodeReferences) != 1 {
+		t.Fatal("code reference schema round trip failed", err)
 	}
 	args["id"], args["expected_revision"] = n.ID, 1
 	check("revise_memory", args)

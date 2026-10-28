@@ -6,8 +6,8 @@
   import ThreeGraphCanvas from './ThreeGraphCanvas.svelte';
   import Icon from './Icon.svelte';
 
-  let { data, projects, loading, projectLoading, suspended = false, onsearch, onopen }: {
-    data: GraphData; projects: string[]; loading: boolean; projectLoading: boolean; suspended?: boolean;
+  let { data, projects, loading, projectLoading, suspended = false, scoped = false, onsearch, onopen }: {
+    data: GraphData; projects: string[]; loading: boolean; projectLoading: boolean; suspended?: boolean; scoped?: boolean;
     onsearch: (query: string, project: string, archived: boolean) => void; onopen: (id: string) => void;
   } = $props();
   const uid = $props.id();
@@ -35,7 +35,7 @@
 
   function search() {
     searchOpen = false;
-    onsearch(query.trim(), project, archived);
+    onsearch(query.trim(), scoped ? '' : project, scoped ? false : archived);
   }
   function open(id: string) {
     if (!id || loading) return;
@@ -114,13 +114,13 @@
           </div>
         {/if}
       </div>
-      <label class="project-field">
+      {#if !scoped}<label class="project-field">
         <span class="sr-only">Proyek</span>
         <select aria-label="Proyek" value={project} onchange={event => { project = event.currentTarget.value; search(); }} disabled={projectLoading}>
           <option value="">Semua proyek</option>
           {#each projects as p}<option value={p}>{p}</option>{/each}
         </select>
-      </label>
+      </label>{/if}
       <div class="filter-area" bind:this={filterArea} onfocusout={leaveFilters}>
         <button type="button" class="tool-button filter-toggle" class:active={filterCount > 0} bind:this={filterButton} aria-label={`Filter tampilan${filterCount ? `, ${filterCount} aktif` : ''}`} title="Filter tampilan" aria-expanded={filtersOpen} aria-controls={`${uid}-filters`} onclick={toggleFilters}>
           <Icon name="filter" />{#if filterCount}<span class="filter-dot" aria-hidden="true"></span>{/if}
@@ -131,7 +131,7 @@
             <label class="filter-field">Jenis catatan<select bind:this={kindInput} bind:value={kind}><option value="">Semua jenis</option>{#each Object.entries(kindLabels) as [value, label]}<option {value}>{label}</option>{/each}</select></label>
             <label class="filter-field">Hubungan<select bind:value={relation}><option value="all">Semua hubungan</option><option value="related_to">Terkait ke</option><option value="supersedes">Menggantikan</option></select></label>
             <label class="check"><input type="checkbox" bind:checked={labels}> Label terdekat (maks. 24–48)</label>
-            <label class="check"><input type="checkbox" checked={archived} onchange={event => { archived = event.currentTarget.checked; search(); }}> Sertakan arsip</label>
+            {#if !scoped}<label class="check"><input type="checkbox" checked={archived} onchange={event => { archived = event.currentTarget.checked; search(); }}> Sertakan arsip</label>{/if}
             <button type="button" class="reset-filters" disabled={!filterCount} onclick={resetFilters}>Reset filter</button>
           </div>
         {/if}

@@ -20,18 +20,20 @@ import (
 	"github.com/yuin/goldmark"
 	"golang.org/x/time/rate"
 	"memona/internal/access"
+	"memona/internal/codeindex"
 	"memona/internal/memory"
 )
 
 type Config struct {
-	Listen             string `json:"listen"`
-	DataDir            string `json:"data_dir"`
-	PublicURL          string `json:"public_url"`
-	TunnelURL          string `json:"tunnel_url"`
-	SecureCookies      bool   `json:"secure_cookies"`
-	AllowPrivateHTTP   bool   `json:"allow_private_http"`
-	GoogleClientID     string `json:"google_client_id,omitempty"`
-	GoogleClientSecret string `json:"google_client_secret,omitempty"`
+	Listen             string                 `json:"listen"`
+	DataDir            string                 `json:"data_dir"`
+	PublicURL          string                 `json:"public_url"`
+	TunnelURL          string                 `json:"tunnel_url"`
+	SecureCookies      bool                   `json:"secure_cookies"`
+	AllowPrivateHTTP   bool                   `json:"allow_private_http"`
+	GoogleClientID     string                 `json:"google_client_id,omitempty"`
+	GoogleClientSecret string                 `json:"google_client_secret,omitempty"`
+	CodeRepositories   []codeindex.Repository `json:"code_repositories,omitempty"`
 }
 type App struct {
 	cfg          Config
@@ -48,6 +50,7 @@ type App struct {
 	keyLimits    *keyLimiter
 	security     *requestSecurity
 	google       *googleOIDC
+	code         *codeindex.Index
 }
 type authenticatedKeyContext struct{}
 
@@ -63,6 +66,9 @@ func privateIP(host string) bool {
 
 // Memona serves HTTP directly or to a TLS reverse proxy.
 func ValidateConfig(cfg Config) error {
+	if err := codeindex.Validate(cfg.CodeRepositories); err != nil {
+		return err
+	}
 	if (cfg.GoogleClientID == "") != (cfg.GoogleClientSecret == "") {
 		return errors.New("Google login requires both google_client_id and google_client_secret")
 	}
@@ -120,8 +126,18 @@ func New(cfg Config, auth *access.Store, notes *memory.Store) (*App, error) {
 	if err := ValidateConfig(cfg); err != nil {
 		return nil, err
 	}
+	var code *codeindex.Index
+	if len(cfg.CodeRepositories) != 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		var err error
+		code, err = codeindex.Build(ctx, cfg.CodeRepositories)
+		if err != nil {
+			return nil, err
+		}
+	}
 	u, _ := url.Parse(cfg.PublicURL)
-	a := &App{cfg: cfg, origin: u.Scheme + "://" + u.Host, host: u.Host, auth: auth, notes: notes, loginLimit: rate.NewLimiter(rate.Every(12*time.Second), 5), mcpLimit: rate.NewLimiter(30, 60), workSlots: make(chan struct{}, 8)}
+	a := &App{cfg: cfg, code: code, origin: u.Scheme + "://" + u.Host, host: u.Host, auth: auth, notes: notes, loginLimit: rate.NewLimiter(rate.Every(12*time.Second), 5), mcpLimit: rate.NewLimiter(30, 60), workSlots: make(chan struct{}, 8)}
 	if cfg.TunnelURL != "" {
 		tunnel, _ := url.Parse(cfg.TunnelURL)
 		a.tunnelHost = tunnel.Host

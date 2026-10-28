@@ -42,42 +42,44 @@ var (
 )
 
 type Note struct {
-	ID               string         `json:"id"`
-	Project          string         `json:"project"`
-	Kind             string         `json:"kind"`
-	Title            string         `json:"title"`
-	Content          string         `json:"content"`
-	Status           string         `json:"status"`
-	Source           string         `json:"source"`
-	Author           string         `json:"author"`
-	Revision         int            `json:"revision"`
-	CreatedAt        string         `json:"created_at"`
-	UpdatedAt        string         `json:"updated_at"`
-	Archived         bool           `json:"archived"`
-	IsProjectSummary bool           `json:"is_project_summary,omitempty"`
-	IsTesting        bool           `json:"is_testing,omitempty"`
-	RelatedTo        []string       `json:"related_to,omitempty"`
-	Supersedes       []string       `json:"supersedes,omitempty"`
-	SkillMetadata    *SkillMetadata `json:"skill_metadata,omitempty"`
-	VerifiedAt       string         `json:"verified_at,omitempty"`
-	NeedsReview      bool           `json:"needs_review,omitempty"`
+	ID               string          `json:"id"`
+	Project          string          `json:"project"`
+	Kind             string          `json:"kind"`
+	Title            string          `json:"title"`
+	Content          string          `json:"content"`
+	Status           string          `json:"status"`
+	Source           string          `json:"source"`
+	Author           string          `json:"author"`
+	Revision         int             `json:"revision"`
+	CreatedAt        string          `json:"created_at"`
+	UpdatedAt        string          `json:"updated_at"`
+	Archived         bool            `json:"archived"`
+	IsProjectSummary bool            `json:"is_project_summary,omitempty"`
+	IsTesting        bool            `json:"is_testing,omitempty"`
+	RelatedTo        []string        `json:"related_to,omitempty"`
+	Supersedes       []string        `json:"supersedes,omitempty"`
+	CodeReferences   []CodeReference `json:"code_references,omitempty"`
+	SkillMetadata    *SkillMetadata  `json:"skill_metadata,omitempty"`
+	VerifiedAt       string          `json:"verified_at,omitempty"`
+	NeedsReview      bool            `json:"needs_review,omitempty"`
 	operation        *operationRecord
 }
 
 type Input struct {
-	Project          string         `json:"project"`
-	Kind             string         `json:"kind"`
-	Title            string         `json:"title"`
-	Content          string         `json:"content"`
-	Status           string         `json:"status" jsonschema:"For fact/decision/knowledge/handoff use unverified or verified (verified requires source evidence). New skills must use draft. NEVER use active for ordinary notes; it is reserved for admin-published skills."`
-	Source           string         `json:"source"`
-	IsProjectSummary *bool          `json:"is_project_summary,omitempty" jsonschema:"Optional project overview flag, knowledge notes only. Omit on revise to preserve; false clears. One nonarchived summary per project, content max 8000 bytes."`
-	IsTesting        *bool          `json:"is_testing,omitempty" jsonschema:"Optional explicit testing/example note flag. Omit on revise to preserve; false clears. Does not change status or permissions."`
-	RelatedTo        []string       `json:"related_to,omitempty" jsonschema:"Optional related note IDs in the SAME project, max 20. Omit on revise to preserve; empty array clears. Requires read and write when supplied."`
-	Supersedes       []string       `json:"supersedes,omitempty" jsonschema:"Optional IDs this note explicitly replaces, SAME project, max 20. Omit on revise to preserve; empty array clears. Requires read and write when supplied. No self links or cycles."`
-	SkillMetadata    *SkillMetadata `json:"skill_metadata,omitempty" jsonschema:"Optional structured metadata for skills only. Omit on revise to preserve; empty object clears. Descriptive text only, not executable or a publish approval."`
-	VerifiedAt       *string        `json:"verified_at,omitempty" jsonschema:"Optional self-declared verification time for non-skills, canonical UTC RFC3339Nano (Z). Requires verified status and source evidence. Omit on revise to preserve while verified; empty string clears. Not a server verification."`
-	NeedsReview      *bool          `json:"needs_review,omitempty" jsonschema:"Optional explicit review flag for non-skills. Omit on revise to preserve; false clears. Does not change status, permissions, or supersedes relations."`
+	Project          string          `json:"project"`
+	Kind             string          `json:"kind"`
+	Title            string          `json:"title"`
+	Content          string          `json:"content"`
+	Status           string          `json:"status" jsonschema:"For fact/decision/knowledge/handoff use unverified or verified (verified requires source evidence). New skills must use draft. NEVER use active for ordinary notes; it is reserved for admin-published skills."`
+	Source           string          `json:"source"`
+	IsProjectSummary *bool           `json:"is_project_summary,omitempty" jsonschema:"Optional project overview flag, knowledge notes only. Omit on revise to preserve; false clears. One nonarchived summary per project, content max 8000 bytes."`
+	IsTesting        *bool           `json:"is_testing,omitempty" jsonschema:"Optional explicit testing/example note flag. Omit on revise to preserve; false clears. Does not change status or permissions."`
+	RelatedTo        []string        `json:"related_to,omitempty" jsonschema:"Optional related note IDs in the SAME project, max 20. Omit on revise to preserve; empty array clears. Requires read and write when supplied."`
+	Supersedes       []string        `json:"supersedes,omitempty" jsonschema:"Optional IDs this note explicitly replaces, SAME project, max 20. Omit on revise to preserve; empty array clears. Requires read and write when supplied. No self links or cycles."`
+	CodeReferences   []CodeReference `json:"code_references,omitempty" jsonschema:"Optional citations, max 10, no file access implied. Omit on revise to preserve; empty array clears. Repository slug and relative path required; commit hex, symbol and line optional. Never put secrets here."`
+	SkillMetadata    *SkillMetadata  `json:"skill_metadata,omitempty" jsonschema:"Optional structured metadata for skills only. Omit on revise to preserve; empty object clears. Descriptive text only, not executable or a publish approval."`
+	VerifiedAt       *string         `json:"verified_at,omitempty" jsonschema:"Optional self-declared verification time for non-skills, canonical UTC RFC3339Nano (Z). Requires verified status and source evidence. Omit on revise to preserve while verified; empty string clears. Not a server verification."`
+	NeedsReview      *bool           `json:"needs_review,omitempty" jsonschema:"Optional explicit review flag for non-skills. Omit on revise to preserve; false clears. Does not change status, permissions, or supersedes relations."`
 }
 
 // Store holds an exclusive process-wide writer lease until Close. Operations on
@@ -264,7 +266,7 @@ func noteInput(n Note) Input {
 		needsReview = &value
 	}
 	return Input{Project: n.Project, Kind: n.Kind, Title: n.Title, Content: n.Content, Status: n.Status, Source: n.Source,
-		IsProjectSummary: &summary, IsTesting: &testing, RelatedTo: n.RelatedTo, Supersedes: n.Supersedes, SkillMetadata: cloneSkillMetadata(n.SkillMetadata),
+		IsProjectSummary: &summary, IsTesting: &testing, RelatedTo: n.RelatedTo, Supersedes: n.Supersedes, CodeReferences: n.CodeReferences, SkillMetadata: cloneSkillMetadata(n.SkillMetadata),
 		VerifiedAt: verifiedAt, NeedsReview: needsReview}
 }
 

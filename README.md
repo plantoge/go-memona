@@ -2,6 +2,8 @@
 
 Memona menyimpan memori proyek untuk manusia dan agen AI. Dashboard admin dan ruang pengguna Google/team terpisah; OpenCode/Hermes terhubung lewat API key. Login Google hanya aktif bila kredensial OAuth dikonfigurasi. Lihat [akun dan team](docs/akun-team.md) sebelum mengaktifkannya. Panduan ini untuk **instalasi baru di Linux** (bukan pemindahan data lama).
 
+Untuk agen coding, Memona dapat dipakai bersama Codebase Memory sebagai sumber struktur kode dan menyimpan rujukan kode pada `source` catatan. Indeks simbol Go lokal opsional tersedia melalui allowlist repository dan tool MCP `search_code_index`; lihat [batas dan konfigurasi indeks](docs/kode-repository.md). Tidak ada repository yang dipindai secara default.
+
 ## 1. Siapkan alat build
 
 Pasang **Git, Go 1.26.8, Node.js 24 LTS (atau ≥22.18), npm, Make, Python 3, dan Bash** di home server. Gunakan akun Linux biasa, bukan root. Cek dengan `go version`, `node --version`, `npm --version`, `python3 --version`.
@@ -32,7 +34,7 @@ make start
 
 Dari folder proyek, tanpa build/isi password lagi. `make run` juga bisa dipakai lagi bila ingin **build ulang lalu start**, tanpa membuat ulang akun/config; menolak jika server masih aktif. `make status` untuk melihat indikasi proses aktif. `make start` tetap di foreground dan tidak otomatis hidup setelah reboot.
 
-Di dashboard admin (`/admin` atau `/`), buat API key berbeda untuk tiap agen lama melalui menu **MCP Server**; token tampil sekali. Pengguna Google (bila dikonfigurasi) masuk di `/user` dan dapat membuat key untuk memori pribadi atau team. Jangan gunakan password admin sebagai API key.
+Di dashboard admin (`/admin`), buat API key berbeda untuk tiap agen lama melalui menu **MCP Server**; token tampil sekali. Pengguna Google (bila dikonfigurasi) masuk di `/` dan dapat membuat key untuk memori pribadi atau team. Jangan gunakan password admin sebagai API key.
 
 Untuk mengaktifkan Google, isi `google_client_id` dan `google_client_secret` di `config.json` lokal, pastikan file privat (`0600`), dan cocokkan redirect URI dengan `public_url`; lihat [panduan akun/team](docs/akun-team.md). Jangan masukkan secret ke Git atau chat.
 

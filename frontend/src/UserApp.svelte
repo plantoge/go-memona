@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import Icon from './lib/components/Icon.svelte';
+  import KnowledgeGraph from './lib/components/KnowledgeGraph.svelte';
+  import { EMPTY_GRAPH, graphData } from './lib/graph';
   import { applyTheme, type Theme } from './lib/theme';
   import { createAPI, array, errorMessage, isStale } from './lib/api';
-  import { date, kindLabels, statusLabel, type Note } from './lib/types';
+  import { date, kindLabels, statusLabel, type Note, type GraphData } from './lib/types';
   import { splitWorkspaces, notePath, expiryValue, type Workspace, type Invitation, type UserKey } from './user-contract';
-  type View = 'notes' | 'keys' | 'teams';
+  type View = 'notes' | 'graph' | 'keys' | 'teams';
   type NoteInput = { workspace_id: string; kind: string; title: string; content: string; status: string; source: string };
   const blankNote = (): NoteInput => ({ workspace_id: '', kind: 'knowledge', title: '', content: '', status: 'unverified', source: '' });
 
@@ -16,6 +18,8 @@
   let workspaceID = $state('');
   let view = $state<View>('notes');
   let notes = $state<Note[]>([]);
+  let graph = $state<GraphData>(EMPTY_GRAPH);
+  let graphQuery = $state('');
   let keys = $state<UserKey[]>([]);
   let invitations = $state<Invitation[]>([]);
   let selected = $state<Note | null>(null);
@@ -45,7 +49,7 @@
   function clearSession() {
     loadID++;
     api.reset(); session = 'out'; user = null; personal = null; teams = []; workspaceID = '';
-    notes = []; keys = []; invitations = []; selected = null; editing = false; editor = blankNote(); token = '';
+    notes = []; graph = EMPTY_GRAPH; graphQuery = ''; keys = []; invitations = []; selected = null; editing = false; editor = blankNote(); token = '';
   }
   function fail(e: unknown) { if (!isStale(e)) { error = errorMessage(e); message = ''; } }
   async function initialize() {
@@ -83,17 +87,23 @@
     const split = splitWorkspaces(result);
     personal = split.personal; teams = split.teams;
     const ids = [split.personal.id, ...split.teams.map(t => t.id)];
-    workspaceID = ids.includes(preferred) ? preferred : split.personal.id;
+    const next = ids.includes(preferred) ? preferred : split.personal.id;
+    if (next !== workspaceID) graphQuery = '';
+    workspaceID = next;
     await loadView();
   }
   async function loadView() {
     const id = ++loadID;
+    const requestedWorkspace = workspaceID;
     loading = true; error = ''; selected = null; editing = false;
-    notes = []; keys = []; invitations = [];
+    notes = []; graph = EMPTY_GRAPH; keys = []; invitations = [];
     try {
-      if (view === 'notes') {
-        const result = array(await api.request<Note[] | null>(`/api/user/notes?${new URLSearchParams({ workspace_id: workspaceID })}`));
-        if (id === loadID) notes = result;
+      if (view === 'graph') {
+        const result = await api.request<GraphData>(`/api/user/graph?${new URLSearchParams({ workspace_id: requestedWorkspace, q: graphQuery })}`);
+        if (id === loadID && requestedWorkspace === workspaceID) graph = graphData(result);
+      } else if (view === 'notes') {
+        const result = array(await api.request<Note[] | null>(`/api/user/notes?${new URLSearchParams({ workspace_id: requestedWorkspace })}`));
+        if (id === loadID && requestedWorkspace === workspaceID) notes = result;
       } else if (view === 'keys') {
         const result = array(await api.request<UserKey[] | null>('/api/user/keys'));
         if (id === loadID) keys = result;
@@ -111,11 +121,13 @@
     }
     if (token) dismissToken();
     workspaceID = next;
-    message = ''; void loadView();
+    graphQuery = ''; message = ''; void loadView();
   }
   function switchView(next: View) {
     if (token && next !== 'keys' && !confirm('Token baru akan disembunyikan. Sudah menyimpannya dengan aman?')) return;
     if (token && next !== 'keys') dismissToken();
+    if (next === view) { if (compactLayout) sidebarOpen = false; return; }
+    graphQuery = '';
     view = next; message = '';
     if (compactLayout) sidebarOpen = false;
     void tick().then(() => main?.focus());
@@ -176,12 +188,22 @@
       await loadView(); message = 'Kunci dicabut.';
     });
   }
-  async function openNote(note: Note) {
+  async function searchGraph(query: string) {
+    graphQuery = query;
+    await loadView();
+  }
+  async function openGraphNote(id: string) {
+    const node = graph.nodes.find(n => n.id === id);
+    if (!node) return;
+    await openNote(node);
+  }
+  async function openNote(note: Pick<Note, 'id'>) {
     const id = ++loadID;
+    const requestedWorkspace = workspaceID;
     loading = true; error = ''; selected = null; editing = false;
     try {
-      const result = await api.request<Note | { note: Note }>(notePath(note.id, workspaceID));
-      if (id === loadID) {
+      const result = await api.request<Note | { note: Note }>(notePath(note.id, requestedWorkspace));
+      if (id === loadID && requestedWorkspace === workspaceID) {
         const item = 'note' in result ? result.note : result;
         if (!item?.id) throw new Error('Detail memori tidak valid.');
         selected = item;
@@ -223,9 +245,10 @@
   {:else if session === 'out'}
     <main id="main" class="login-wrap"><section class="login-card" aria-labelledby="login-title">
       <div class="brand"><span class="brand-mark" aria-hidden="true">m</span> memona<span class="brand-dot" aria-hidden="true">.</span></div>
-      <p class="eyebrow">RUANG KERJA / MEMONA</p>
-      <h1 id="login-title">Masuk</h1>
-      <p>Kelola memori pribadi dan tim dengan akun Google Anda.</p>
+      <p class="eyebrow">MEMORI YANG TETAP TERHUBUNG</p>
+      <h1 id="login-title">Pengetahuan Anda,<br><span>selalu terhubung.</span></h1>
+      <p>Simpan ide, keputusan, dan konteks kerja dalam satu ruang yang mudah ditemukan kembali. Mulai dari ruang pribadi, lalu bangun pengetahuan bersama tim.</p>
+      <div class="login-features" aria-label="Fitur ruang kerja"><span><Icon name="notes" /> Catatan tertata</span><span><Icon name="graph" /> Peta keterkaitan</span><span><Icon name="projects" /> Ruang tim</span></div>
       {#if error}<p class="inline-error" role="alert">{error}</p>{/if}
       {#if message}<p class="notice" role="status">{message}</p>{/if}
       <a class="user-primary-link primary full" href="/auth/google/start">Masuk dengan Google</a>
@@ -250,6 +273,7 @@
           <nav aria-label="Navigasi utama" class={`active-${view}`}>
             <span class="nav-indicator" aria-hidden="true"></span>
             <button type="button" aria-label="Memori" title={!sidebarOpen ? 'Memori' : undefined} aria-current={view === 'notes' ? 'page' : undefined} onclick={() => switchView('notes')} disabled={busy}><Icon name="notes" /><span class="nav-text">Memori</span></button>
+            <button type="button" aria-label="Knowledge Graph" title={!sidebarOpen ? 'Knowledge Graph' : undefined} aria-current={view === 'graph' ? 'page' : undefined} onclick={() => switchView('graph')} disabled={busy}><Icon name="graph" /><span class="nav-text">Knowledge Graph</span></button>
             <button type="button" aria-label="Kunci MCP" title={!sidebarOpen ? 'Kunci MCP' : undefined} aria-current={view === 'keys' ? 'page' : undefined} onclick={() => switchView('keys')} disabled={busy}><Icon name="keys" /><span class="nav-text">Kunci MCP</span></button>
             <button type="button" aria-label="Tim & undangan" title={!sidebarOpen ? 'Tim & undangan' : undefined} aria-current={view === 'teams' ? 'page' : undefined} onclick={() => switchView('teams')} disabled={busy}><Icon name="projects" /><span class="nav-text">Tim & undangan</span></button>
           </nav>
@@ -257,7 +281,7 @@
         </div>
       </aside>
       <main id="main" tabindex="-1" bind:this={main!} inert={compactLayout && sidebarOpen}>
-        <header class="workspace-heading"><span class="eyebrow">RUANG KERJA / {current?.name || 'MEMONA'}</span><h1>{view === 'notes' ? 'Memori' : view === 'keys' ? 'Kunci MCP' : 'Tim & undangan'}</h1>
+        <header class="workspace-heading"><span class="eyebrow">RUANG KERJA / {current?.name || 'MEMONA'}</span><h1>{view === 'notes' ? 'Memori' : view === 'graph' ? 'Knowledge Graph' : view === 'keys' ? 'Kunci MCP' : 'Tim & undangan'}</h1>
           {#if !sidebarOpen && !compactLayout}<div class="collapsed-workspace"><label for="workspace-collapsed">Ruang kerja</label><select id="workspace-collapsed" value={workspaceID} onchange={changeWorkspace} disabled={busy}>{#each workspaces as workspace (workspace.id)}<option value={workspace.id}>{workspace.name}{workspace.id === personal?.id ? ' · Pribadi' : ''}</option>{/each}</select></div>{/if}
         </header>
         {#if error}<p class="alert" role="alert">{error}</p>{/if}
@@ -280,6 +304,11 @@
           {/if}
           {#if !loading && notes.length === 0}<p class="empty">Belum ada memori di ruang kerja ini.</p>{/if}
           <ul class="item-list">{#each notes as note (note.id)}<li><button type="button" class="item-button" onclick={() => openNote(note)}><strong>{note.title}</strong><span>{kindLabels[note.kind] || note.kind} · {statusLabel(note.status)} · {date(note.updated_at)}</span></button></li>{/each}</ul>
+        {:else if view === 'graph'}
+          <p class="lead">Jelajahi hubungan eksplisit antarmemori di {current?.name || 'ruang kerja ini'}. Hanya catatan aktif dalam ruang kerja ini yang ditampilkan.</p>
+          {#if selected}<article class="panel note-detail" aria-label="Detail memori"><div class="section-head"><div><p class="eyebrow">{kindLabels[selected.kind] || selected.kind} · Revisi {selected.revision}</p><h2>{selected.title}</h2></div><button type="button" class="secondary" onclick={() => selected = null}>Tutup</button></div><p class="hint">{statusLabel(selected.status)} · {date(selected.updated_at)} · Sumber: {selected.source}</p><pre class="note-body">{selected.content}</pre><button type="button" class="secondary" onclick={() => { view = 'notes'; startNote(selected!); }} disabled={busy}>Sunting di Memori</button></article>{/if}
+          <div class="user-graph">{#key workspaceID}<KnowledgeGraph data={graph} projects={[]} {loading} projectLoading={false} scoped suspended={!!selected} onsearch={(query) => { void searchGraph(query); }} onopen={(id) => { void openGraphNote(id); }} />{/key}</div>
+          {#if graph.truncated}<p class="hint" role="status">Graph dibatasi. Persempit pencarian untuk melihat catatan lain.</p>{/if}
         {:else if view === 'keys'}
           <p class="lead">Buat kunci untuk menghubungkan MCP ke ruang kerja yang dipilih. Token baru hanya ditampilkan sekali.</p><p class="hint">Endpoint MCP: <code>{window.location.origin}/mcp</code>. Project untuk tool MCP: <code>{current?.project || '—'}</code>. Gunakan project ini saat menyimpan atau mencari memori di ruang kerja terpilih.</p><p class="hint">Batas awal: 100 kunci per akun, termasuk kunci yang dicabut.</p>
           {#if token}<section class="panel token-panel" aria-label="Token kunci baru"><h2>Salin token sekarang</h2><p>Jangan bagikan token ini. Setelah ditutup, token tidak dapat ditampilkan kembali.</p><code>{token}</code><button type="button" class="quiet" onclick={dismissToken}>Saya sudah menyimpan token</button></section>{/if}

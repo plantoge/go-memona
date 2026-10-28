@@ -12,6 +12,9 @@ func validateMetadata(in Input) error {
 	if err := validateSkillMetadata(in.Kind, in.SkillMetadata); err != nil {
 		return err
 	}
+	if err := validateCodeReferences(in.CodeReferences); err != nil {
+		return err
+	}
 	if in.IsProjectSummary != nil && *in.IsProjectSummary && (in.Kind != "knowledge" || len(in.Content) > MaxSummaryBytes) {
 		return fmt.Errorf("%w: project summary must be knowledge with content at most 8000 bytes", ErrInvalid)
 	}
@@ -46,6 +49,9 @@ func applyMetadata(n *Note, in Input) {
 	}
 	if in.Supersedes != nil {
 		n.Supersedes = append([]string(nil), in.Supersedes...)
+	}
+	if in.CodeReferences != nil {
+		n.CodeReferences = append([]CodeReference(nil), in.CodeReferences...)
 	}
 }
 

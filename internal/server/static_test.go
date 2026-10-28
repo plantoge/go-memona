@@ -19,14 +19,14 @@ func TestDashboardBuiltAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	user, err := fs.ReadFile(webui.Files, "user.html")
+	admin, err := fs.ReadFile(webui.Files, "admin.html")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(user, []byte("/assets/")) {
-		t.Fatal("user page must reference built assets")
+	if !bytes.Contains(index, []byte("/assets/")) || !bytes.Contains(admin, []byte("/assets/")) || bytes.Equal(index, admin) {
+		t.Fatal("user and admin pages must reference distinct built assets")
 	}
-	files := []string{"/", "/index.html", "/admin", "/admin/", "/user", "/user/", "/user.html"}
+	files := []string{"/", "/index.html", "/admin", "/admin/", "/admin.html"}
 	assetCount := 0
 	err = fs.WalkDir(webui.Files, "assets", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -41,17 +41,17 @@ func TestDashboardBuiltAssets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if assetCount == 0 || !bytes.Contains(index, []byte("/assets/")) {
-		t.Fatal("dashboard must reference built assets")
+	if assetCount == 0 {
+		t.Fatal("dashboard must include built assets")
 	}
 	const csp = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 	for _, urlPath := range files {
 		t.Run(urlPath, func(t *testing.T) {
 			name := strings.TrimPrefix(urlPath, "/")
-			if name == "" || name == "admin" || name == "admin/" {
+			if name == "" {
 				name = "index.html"
-			} else if name == "user" || name == "user/" {
-				name = "user.html"
+			} else if name == "admin" || name == "admin/" {
+				name = "admin.html"
 			}
 			want, err := fs.ReadFile(webui.Files, name)
 			if err != nil {
@@ -104,6 +104,7 @@ func TestDashboardRejectsPrivateAndMissingPaths(t *testing.T) {
 		"/.env", "/config.json", "/data/notes/private.md", "/internal/webui/embed.go",
 		"/dist/index.html", "/app.js", "/style.css", "/notes", "/assets",
 		"/assets/", "/assets/missing.js", "/assets/config.json", "/index.html/extra",
+		"/user", "/user/", "/user.html", "/admin.html/extra",
 	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			t.Run(method+urlPath, func(t *testing.T) {

@@ -212,7 +212,7 @@ func TestMCPRoundTripAndScopes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	tools, e := session.ListTools(ctx, nil)
-	if e != nil || len(tools.Tools) != 11 {
+	if e != nil || len(tools.Tools) != 12 {
 		t.Fatalf("tools %v %v", tools, e)
 	}
 	guide := call(t, session, "get_memory_guide", map[string]any{})
